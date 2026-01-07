@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Builder - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/student">Dashboard</a></li>
+                <li><a href="/tests">Tests</a></li>
+                <li><a href="/dashboard">Performance</a></li>
+                <li><a href="/resume">Resume</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin: 40px 0 30px;">Resume Builder</h1>
+        
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-header">Build Your Resume</div>
+                <div class="card-body">
+                    <form id="resume-form" onsubmit="handleResumeSave(event)">
+                        <div class="form-group">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" id="full_name" class="form-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" id="email" class="form-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" id="phone" class="form-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Education</label>
+                            <textarea id="education" class="form-textarea" placeholder="Your educational qualifications..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Skills</label>
+                            <textarea id="skills" class="form-textarea" placeholder="List your technical and soft skills..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Experience</label>
+                            <textarea id="experience" class="form-textarea" placeholder="Work experience or internships..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Projects</label>
+                            <textarea id="projects" class="form-textarea" placeholder="Academic or personal projects..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Certifications</label>
+                            <textarea id="certifications" class="form-textarea" placeholder="Certifications and achievements..."></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">
+                            Save & Analyze Resume
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div>
+                <div id="resume-score">
+                    <div class="card">
+                        <div class="card-header">Resume Score</div>
+                        <div class="card-body">
+                            <p>Fill out the resume form and click "Save & Analyze Resume" to get your ATS score, keyword analysis, and improvement suggestions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

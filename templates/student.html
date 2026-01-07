@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/student">Dashboard</a></li>
+                <li><a href="/tests">Tests</a></li>
+                <li><a href="/dashboard">Performance</a></li>
+                <li><a href="/resume">Resume</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin: 40px 0 30px;">Student Dashboard</h1>
+        
+        <div class="grid grid-4" style="margin-bottom: 40px;">
+            <div class="stat-card">
+                <div class="stat-value" id="total-tests">0</div>
+                <div class="stat-label">Tests Taken</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-score">0%</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="readiness-score">0%</div>
+                <div class="stat-label">Readiness Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="resume-score">0%</div>
+                <div class="stat-label">Resume Score</div>
+            </div>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-header">Quick Actions</div>
+                <div class="card-body">
+                    <a href="/tests" class="btn btn-primary" style="display: block; text-align: center; margin-bottom: 15px;">
+                        Take a Test
+                    </a>
+                    <a href="/resume" class="btn btn-secondary" style="display: block; text-align: center; margin-bottom: 15px;">
+                        Build Resume
+                    </a>
+                    <a href="/dashboard" class="btn btn-secondary" style="display: block; text-align: center;">
+                        View Analytics
+                    </a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">Recent Activity</div>
+                <div class="card-body" id="recent-activity">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        // Load dashboard stats
+        async function loadDashboardStats() {
+            const scores = await apiCall('/api/user_scores');
+            const recommendations = await apiCall('/api/ai_recommendations');
+            const resume = await apiCall('/api/get_resume');
+            
+            // Calculate stats
+            const totalTests = scores.length;
+            const avgScore = scores.length > 0 
+                ? scores.reduce((sum, s) => sum + s.score, 0) / scores.length 
+                : 0;
+            
+            document.getElementById('total-tests').textContent = totalTests;
+            document.getElementById('avg-score').textContent = avgScore.toFixed(1) + '%';
+            document.getElementById('readiness-score').textContent = 
+                (recommendations.readiness_score || 0).toFixed(1) + '%';
+            document.getElementById('resume-score').textContent = 
+                (resume.overall_score || 0).toFixed(1) + '%';
+            
+            // Show recent activity
+            const activityContainer = document.getElementById('recent-activity');
+            if (scores.length > 0) {
+                activityContainer.innerHTML = scores.slice(0, 3).map(score => `
+                    <p style="margin-bottom: 10px;">
+                        <strong>${score.section_name}</strong>: ${score.score.toFixed(1)}%
+                        <br><small style="color: var(--text-secondary);">${timeAgo(score.completed_at)}</small>
+                    </p>
+                `).join('');
+            } else {
+                activityContainer.innerHTML = '<p>No recent activity. Start taking tests!</p>';
+            }
+        }
+        
+        loadDashboardStats();
+    </script>
+</body>
+</html>

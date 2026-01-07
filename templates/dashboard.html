@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Dashboard - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/student">Dashboard</a></li>
+                <li><a href="/tests">Tests</a></li>
+                <li><a href="/dashboard">Performance</a></li>
+                <li><a href="/resume">Resume</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin: 40px 0 30px;">Performance Analytics</h1>
+        
+        <h2 style="margin: 30px 0 20px;">Section-wise Performance</h2>
+        <div id="performance-chart" class="grid grid-2">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading performance data...</p>
+            </div>
+        </div>
+        
+        <h2 style="margin: 40px 0 20px;">AI-Based Recommendations</h2>
+        <div id="ai-recommendations" class="grid grid-2">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Generating recommendations...</p>
+            </div>
+        </div>
+        
+        <h2 style="margin: 40px 0 20px;">Test History</h2>
+        <div id="scores-table">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading test history...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/admin">Admin Dashboard</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin: 40px 0 30px;">Admin Dashboard</h1>
+        
+        <h2 style="margin: 30px 0 20px;">Department Statistics</h2>
+        <div id="department-stats" class="grid grid-3">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading department stats...</p>
+            </div>
+        </div>
+        
+        <h2 style="margin: 40px 0 20px;">All Students</h2>
+        <div id="students-table">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading students...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

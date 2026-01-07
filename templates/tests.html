@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tests - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/student">Dashboard</a></li>
+                <li><a href="/tests">Tests</a></li>
+                <li><a href="/dashboard">Performance</a></li>
+                <li><a href="/resume">Resume</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin: 40px 0 30px;">Take Tests</h1>
+        
+        <div class="alert alert-info">
+            Select a test section below to begin. Answer all questions and submit to see your score and get AI-based recommendations.
+        </div>
+        
+        <div id="test-sections" class="grid grid-3" style="margin-top: 30px;">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading tests...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 500px; margin-top: 60px;">
+        <div class="card">
+            <div class="card-header" style="text-align: center; font-size: 28px;">Login to PLACIFY</div>
+            
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" id="username" class="form-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="password" class="form-input" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                <p style="text-align: center; color: var(--text-secondary);">
+                    Don't have an account? <a href="#" onclick="showRegisterForm()" style="color: var(--primary-cyan);">Register here</a>
+                </p>
+            </div>
+        </div>
+        
+        <div id="register-card" class="card" style="display: none; margin-top: 20px;">
+            <div class="card-header" style="text-align: center; font-size: 28px;">Register</div>
+            
+            <form id="register-form" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="reg-fullname" class="form-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" id="reg-username" class="form-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="reg-email" class="form-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="reg-password" class="form-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select id="reg-department" class="form-select" required>
+                        <option value="">Select Department</option>
+                        <option value="Computer Science">Computer Science</option>
+                        <option value="Information Technology">Information Technology</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Mechanical">Mechanical</option>
+                        <option value="Civil">Civil</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Year</label>
+                    <select id="reg-year" class="form-select" required>
+                        <option value="">Select Year</option>
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>
+            </form>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="#" onclick="hideRegisterForm()" style="color: var(--primary-cyan);">Back to Login</a>
+            </div>
+        </div>
+        
+        <div class="alert alert-info" style="margin-top: 30px;">
+            <strong>Demo Credentials:</strong><br>
+            Admin - Username: admin, Password: admin123<br>
+            Student - Username: student1, Password: student123
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        function showRegisterForm() {
+            document.getElementById('login-form').parentElement.style.display = 'none';
+            document.getElementById('register-card').style.display = 'block';
+        }
+        
+        function hideRegisterForm() {
+            document.getElementById('login-form').parentElement.style.display = 'block';
+            document.getElementById('register-card').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
