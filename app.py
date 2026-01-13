@@ -6,13 +6,16 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import pyodbc
 
 conn = pyodbc.connect(
-    "Driver={SQL Server};"
+    "Driver={ODBC Driver 17 for SQL Server};"
     "Server=localhost;"
     "Database=PlacifyDB;"
     "Trusted_Connection=yes;"
 )
 
 cursor = conn.cursor()
+cursor.execute("SELECT * FROM Users")
+print(cursor.fetchall())
+
 #########
 
 import json
