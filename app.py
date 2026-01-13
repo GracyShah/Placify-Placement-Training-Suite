@@ -2,7 +2,19 @@
 # Flask Backend Server
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import sqlite3
+########
+import pyodbc
+
+conn = pyodbc.connect(
+    "Driver={SQL Server};"
+    "Server=localhost;"
+    "Database=PlacifyDB;"
+    "Trusted_Connection=yes;"
+)
+
+cursor = conn.cursor()
+#########
+
 import json
 from datetime import datetime
 import os
