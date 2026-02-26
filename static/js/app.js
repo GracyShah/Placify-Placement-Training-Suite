@@ -617,3 +617,36 @@ document.addEventListener("DOMContentLoaded", () => {
     loadDepartmentStats()
   }
 })
+
+
+//////////////////////////////////////
+//company tests page
+async function loadCompanyTests() {
+  const companies = await apiCall("/api/company_tests")
+
+  const container = document.getElementById("company-tests")
+  if (!container) return
+
+  container.innerHTML = ""
+
+  companies.forEach(c => {
+    const card = document.createElement("div")
+    card.className = "card"
+    card.innerHTML = `
+      <div class="card-header">${c.company_name}</div>
+      <div class="card-body">
+        <p><strong>Duration:</strong> ${c.duration} mins</p>
+        <p><strong>Pattern:</strong> ${c.pattern}</p>
+        <button class="btn btn-primary"
+          onclick="startCompanyTest(${c.id})">
+          Start Test
+        </button>
+      </div>
+    `
+    container.appendChild(card)
+  })
+}
+
+if (path === "/company-tests") {
+  loadCompanyTests()
+}

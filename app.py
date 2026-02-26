@@ -172,6 +172,12 @@ def api_logout():
     session.clear()
     return jsonify({'success': True})
 
+@app.route('/company-tests')
+def company_tests_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    return render_template('company_tests.html')
+
 @app.route('/api/test_sections', methods=['GET'])
 def api_test_sections():
     """Get all test sections"""
