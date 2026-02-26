@@ -20,21 +20,43 @@
         </div>
     </nav>
 
-    <div class="container">
-        <h1 style="margin: 40px 0 30px;">Take Tests</h1>
-        
-        <div class="alert alert-info">
-            Select a test section below to begin. Answer all questions and submit to see your score and get AI-based recommendations.
-        </div>
-        
-        <div id="test-sections" class="grid grid-3" style="margin-top: 30px;">
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Loading tests...</p>
-            </div>
+    <div class="container" id="main-container">
+
+    <h1 id="page-title" style="margin: 40px 0 20px;">Take Tests</h1>
+
+    <!-- TIMER BAR -->
+    <div id="timer-container" class="timer-container hidden">
+        <span id="test-title">Logical Reasoning Test</span>
+        <span id="timer">Time Left: 15:00</span>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <div id="test-instruction" class="alert alert-info">
+        Select a test section below to begin. Answer all questions and submit to see your score and get AI-based recommendations.
+    </div>
+
+    <!-- TEST SECTIONS -->
+    <div id="test-sections" class="grid grid-3" style="margin-top: 30px;">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading tests...</p>
         </div>
     </div>
+
+    <!-- QUESTIONS -->
+    <div id="questions-container" class="questions-container hidden">
+        <!-- questions will be injected by JS -->
+    </div>
+
+    <!-- FIXED SUBMIT BUTTON -->
+    <div id="submit-container" class="submit-container hidden">
+        <button class="btn btn-primary" onclick="submitTest()">Submit Test</button>
+    </div>
+
+</div>
+
 
     <script src="/static/js/app.js"></script>
 </body>
 </html>
+

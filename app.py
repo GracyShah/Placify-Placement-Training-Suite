@@ -21,7 +21,21 @@ print(cursor.fetchall())
 
 import json
 from datetime import datetime
+############################################################
+import pytz
+
+# IST timezone
+IST = pytz.timezone("Asia/Kolkata")
+def current_time():
+    return datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+############################################################
 import os
+
+
+
+
+
+
 
 app = Flask(__name__)
 app.secret_key = 'placify-secret-key-change-in-production'
@@ -171,16 +185,79 @@ def api_questions(section_id):
                          [section_id])
     return jsonify([dict(row) for row in questions])
 
+
+
 @app.route('/api/submit_test', methods=['POST'])
 def api_submit_test():
-    """Submit test and calculate score"""
     if 'user_id' not in session:
         return jsonify({'success': False, 'message': 'Not logged in'}), 401
+
+    data = request.get_json()
+    section_id = data.get('section_id')
+    answers = data.get('answers', {})
+    time_taken = data.get('time_taken', 0)  # ✅ FIXED
+    timestamp = current_time()               # ✅ IST TIME
+
+    questions = query_db(
+        'SELECT id, correct_answer, points FROM questions WHERE section_id = ?',
+        [section_id]
+    )
+
+    correct_count = 0
+    total_points = 0
+    earned_points = 0
+
+    # ✅ Insert attempt WITH timestamp
+    attempt_id = execute_db(
+        '''INSERT INTO test_attempts 
+           (user_id, section_id, total_questions, time_taken, completed_at)
+           VALUES (?, ?, ?, ?, ?)''',
+        [session['user_id'], section_id, len(questions), time_taken, timestamp]
+    )
+
+    for question in questions:
+        q_id = question['id']
+        correct_ans = question['correct_answer']
+        points = question['points']
+        total_points += points
+
+        selected_ans = answers.get(str(q_id), '')
+        is_correct = selected_ans.upper() == correct_ans.upper()
+
+        if is_correct:
+            correct_count += 1
+            earned_points += points
+
+        execute_db(
+            '''INSERT INTO user_responses 
+               (attempt_id, question_id, selected_answer, is_correct)
+               VALUES (?, ?, ?, ?)''',
+            [attempt_id, q_id, selected_ans, is_correct]
+        )
+
+    score = (earned_points / total_points * 100) if total_points > 0 else 0
+
+    execute_db(
+        'UPDATE test_attempts SET score = ?, correct_answers = ? WHERE id = ?',
+        [score, correct_count, attempt_id]
+    )
+
+    generate_ai_recommendations(session['user_id'])
+
+    return jsonify({
+        'success': True,
+        'score': round(score, 2),
+        'correct': correct_count,
+        'total': len(questions),
+        'attempt_id': attempt_id
+    })
+
+
     
     data = request.get_json()
     section_id = data.get('section_id')
     answers = data.get('answers')  # {question_id: selected_answer}
-    time_taken = data.get('time_taken', 0)
+    time_taken = data.get('current_time()')
     
     # Get correct answers
     questions = query_db('SELECT id, correct_answer, points FROM questions WHERE section_id = ?',
@@ -191,10 +268,12 @@ def api_submit_test():
     earned_points = 0
     
     # Create test attempt
-    attempt_id = execute_db('''INSERT INTO test_attempts (user_id, section_id, total_questions, time_taken)
-                               VALUES (?, ?, ?, ?)''',
-                            [session['user_id'], section_id, len(questions), time_taken])
-    
+    attempt_id = execute_db('''
+INSERT INTO test_attempts (user_id, section_id, total_questions, time_taken)
+VALUES (?, ?, ?, ?)
+''',
+[session['user_id'], section_id, len(questions), time_taken])
+
     # Check answers
     for question in questions:
         q_id = question['id']
@@ -231,7 +310,6 @@ def api_submit_test():
         'total': len(questions),
         'attempt_id': attempt_id
     })
-
 @app.route('/api/user_scores', methods=['GET'])
 def api_user_scores():
     """Get user's test scores"""
@@ -266,48 +344,6 @@ def api_section_performance():
 
 from flask import request, jsonify
 
-@app.route("/api/save_resume", methods=["POST"])
-def save_resume():
-    data = request.json
-
-    # Simple ATS scoring logic (demo)
-    score = 0
-    suggestions = []
-
-    if len(data.get("skills", "")) > 30:
-        score += 25
-    else:
-        suggestions.append("Add more technical and soft skills.")
-
-    if len(data.get("projects", "")) > 30:
-        score += 25
-    else:
-        suggestions.append("Add more detailed project descriptions.")
-
-    if len(data.get("education", "")) > 20:
-        score += 20
-    else:
-        suggestions.append("Education section needs more clarity.")
-
-    if data.get("experience"):
-        score += 15
-    else:
-        suggestions.append("Add internships or work experience.")
-
-    if data.get("certifications"):
-        score += 15
-    else:
-        suggestions.append("Add relevant certifications.")
-
-    result = {
-        "success": True,
-        "scores": {
-            "ats_score": score,
-            "suggestions": suggestions
-        }
-    }
-
-    return jsonify(result)
 
 @app.route('/api/save_resume', methods=['POST'])
 def api_save_resume():

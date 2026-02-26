@@ -124,9 +124,12 @@ async function loadTestSections() {
                 <p>${section.description}</p>
                 <p><strong>Questions:</strong> ${section.total_questions}</p>
                 <p><strong>Time Limit:</strong> ${section.time_limit} minutes</p>
-                <button class="btn btn-primary mt-20" onclick="startTest(${section.id}, '${section.section_name}')">
-                    Start Test
+                <button class="btn btn-primary mt-20"
+                  onclick="startTest(${section.id}, '${section.section_name}', ${section.time_limit})">
+                  Start Test
                 </button>
+
+
             </div>
         `
     container.appendChild(card)
@@ -140,55 +143,68 @@ const currentTest = {
   questions: [],
   answers: {},
   startTime: null,
+  duration: 0,        // seconds
+  timerInterval: null // interval reference
 }
 
-async function startTest(sectionId, sectionName) {
+
+async function startTest(sectionId, sectionName, timeLimitMinutes) {
   currentTest.sectionId = sectionId
   currentTest.sectionName = sectionName
   currentTest.startTime = Date.now()
   currentTest.answers = {}
+  currentTest.duration = timeLimitMinutes * 60 // convert to seconds
 
   const questions = await apiCall(`/api/questions/${sectionId}`)
   currentTest.questions = questions
 
   displayQuestions()
+  startTimer() // ⏱ START TIMER
 }
+
 
 // Display questions
 function displayQuestions() {
-  const container = document.getElementById("test-sections")
-  if (!container) return
-
-  container.innerHTML = `
-        <h2>${currentTest.sectionName} Test</h2>
-        <div id="questions-container"></div>
-        <div class="flex-between mt-20">
-            <button class="btn btn-secondary" onclick="loadTestSections()">Cancel</button>
-            <button class="btn btn-primary" onclick="submitTest()">Submit Test</button>
-        </div>
-    `
-
+  const sectionsContainer = document.getElementById("test-sections")
   const questionsContainer = document.getElementById("questions-container")
+  const timerContainer = document.getElementById("timer-container")
+  const submitContainer = document.getElementById("submit-container")
+
+  if (!sectionsContainer || !questionsContainer) return
+
+  // Hide test cards
+  sectionsContainer.classList.add("hidden")
+
+  // Show timer + questions + submit
+  timerContainer.classList.remove("hidden")
+  questionsContainer.classList.remove("hidden")
+  submitContainer.classList.remove("hidden")
+
+  // Set test title
+  document.getElementById("test-title").textContent =
+    currentTest.sectionName + " Test"
+
+  questionsContainer.innerHTML = ""
 
   currentTest.questions.forEach((question, index) => {
     const questionCard = document.createElement("div")
     questionCard.className = "question-card"
     questionCard.innerHTML = `
-            <div class="question-text">
-                <strong>Q${index + 1}.</strong> ${question.question_text}
+      <div class="question-text">
+        <strong>Q${index + 1}.</strong> ${question.question_text}
+      </div>
+      <div class="options">
+        ${["A", "B", "C", "D"]
+          .map(
+            (opt) => `
+            <div class="option" onclick="selectAnswer(${question.id}, '${opt}', this)">
+              <strong>${opt}.</strong> ${question["option_" + opt.toLowerCase()]}
             </div>
-            <div class="options">
-                ${["A", "B", "C", "D"]
-                  .map(
-                    (opt) => `
-                    <div class="option" onclick="selectAnswer(${question.id}, '${opt}', this)">
-                        <strong>${opt}.</strong> ${question["option_" + opt.toLowerCase()]}
-                    </div>
-                `,
-                  )
-                  .join("")}
-            </div>
-        `
+          `
+          )
+          .join("")}
+      </div>
+    `
     questionsContainer.appendChild(questionCard)
   })
 }
@@ -206,8 +222,42 @@ function selectAnswer(questionId, answer, element) {
   currentTest.answers[questionId] = answer
 }
 
+function startTimer() {
+  let remaining = currentTest.duration
+  const timerEl = document.getElementById("timer")
+
+  function updateTimer() {
+    const min = Math.floor(remaining / 60)
+    const sec = remaining % 60
+
+    timerEl.textContent = `Time Left: ${min
+      .toString()
+      .padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
+
+    if (remaining <= 30) {
+      timerEl.parentElement.classList.add("timer-warning")
+    }
+
+    if (remaining <= 0) {
+      clearInterval(currentTest.timerInterval)
+      showAlert("Time is up! Test auto-submitted.", "error")
+      submitTest() // 🚀 AUTO SUBMIT
+    }
+
+    remaining--
+  }
+
+  updateTimer()
+  currentTest.timerInterval = setInterval(updateTimer, 1000)
+}
+
 // Submit test
 async function submitTest() {
+  if (currentTest.timerInterval) {
+    clearInterval(currentTest.timerInterval)
+    currentTest.timerInterval = null
+  }
+
   const timeTaken = Math.floor((Date.now() - currentTest.startTime) / 1000)
 
   const result = await apiCall("/api/submit_test", "POST", {
@@ -223,22 +273,34 @@ async function submitTest() {
   }
 }
 
+
 // Display test result
 function displayTestResult(result) {
-  const container = document.getElementById("test-sections")
-  if (!container) return
+  const sectionsContainer = document.getElementById("test-sections")
+  const questionsContainer = document.getElementById("questions-container")
+  const timerContainer = document.getElementById("timer-container")
+  const submitContainer = document.getElementById("submit-container")
 
-  container.innerHTML = `
-        <div class="score-display">
-            <h2>Test Completed!</h2>
-            <div class="score-circle">${result.score}%</div>
-            <p style="font-size: 20px; margin: 20px 0;">
-                You answered <strong>${result.correct}</strong> out of <strong>${result.total}</strong> questions correctly!
-            </p>
-            <button class="btn btn-primary" onclick="loadTestSections()">Take Another Test</button>
-            <a href="/dashboard" class="btn btn-secondary ml-10">View Dashboard</a>
-        </div>
-    `
+  // Hide test UI
+  questionsContainer.classList.add("hidden")
+  timerContainer.classList.add("hidden")
+  submitContainer.classList.add("hidden")
+
+  // Show sections container
+  sectionsContainer.classList.remove("hidden")
+
+  sectionsContainer.innerHTML = `
+    <div class="score-display">
+      <h2>Test Completed!</h2>
+      <div class="score-circle">${result.score}%</div>
+      <p style="font-size: 20px; margin: 20px 0;">
+        You answered <strong>${result.correct}</strong> out of 
+        <strong>${result.total}</strong> questions correctly!
+      </p>
+      <button class="btn btn-primary" onclick="loadTestSections()">Take Another Test</button>
+      <a href="/dashboard" class="btn btn-secondary ml-10">View Dashboard</a>
+    </div>
+  `
 }
 
 // Load user scores
