@@ -4,14 +4,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import sqlite3
 ########
-import pyodbc
 
-conn = pyodbc.connect(
-    "Driver={ODBC Driver 17 for SQL Server};"
-    "Server=localhost;"
-    "Database=PlacifyDB;"
-    "Trusted_Connection=yes;"
-)
 
 cursor = conn.cursor()
 cursor.execute("SELECT * FROM Users")
