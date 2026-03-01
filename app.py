@@ -4,10 +4,12 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import sqlite3
 ########
+import sqlite3
 
-
+conn = sqlite3.connect("database.db")
 cursor = conn.cursor()
-cursor.execute("SELECT * FROM Users")
+
+cursor.execute("SELECT * FROM users")
 print(cursor.fetchall())
 
 #########
