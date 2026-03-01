@@ -17,14 +17,13 @@ print(cursor.fetchall())
 import json
 from datetime import datetime
 ############################################################
-import pytz
+from datetime import datetime
+from zoneinfo import ZoneInfo   # built-in
 
-# IST timezone
-IST = pytz.timezone("Asia/Kolkata")
 def current_time():
-    return datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S")
 ############################################################
-import os
+
 
 
 
