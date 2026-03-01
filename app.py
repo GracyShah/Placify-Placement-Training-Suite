@@ -201,8 +201,8 @@ def api_submit_test():
     data = request.get_json()
     section_id = data.get('section_id')
     answers = data.get('answers', {})
-    time_taken = data.get('time_taken', 0)  # ✅ FIXED
-    timestamp = current_time()               # ✅ IST TIME
+    time_taken = data.get('time_taken', 0)  #  FIXED
+    timestamp = current_time()               #  IST TIME
 
     questions = query_db(
         'SELECT id, correct_answer, points FROM questions WHERE section_id = ?',
@@ -258,64 +258,22 @@ def api_submit_test():
         'attempt_id': attempt_id
     })
 
+    
+@app.route('/api/company_tests', methods=['GET'])
+def api_company_tests():
+    tests = query_db("""
+        SELECT
+            ct.id,
+            c.company_name,
+            ct.test_name,
+            ct.total_duration,
+            ct.total_questions
+        FROM company_tests ct
+        JOIN companies c ON ct.company_id = c.id
+        ORDER BY c.company_name
+    """)
+    return jsonify([dict(row) for row in tests])
 
-    
-    data = request.get_json()
-    section_id = data.get('section_id')
-    answers = data.get('answers')  # {question_id: selected_answer}
-    time_taken = data.get('current_time()')
-    
-    # Get correct answers
-    questions = query_db('SELECT id, correct_answer, points FROM questions WHERE section_id = ?',
-                         [section_id])
-    
-    correct_count = 0
-    total_points = 0
-    earned_points = 0
-    
-    # Create test attempt
-    attempt_id = execute_db('''
-INSERT INTO test_attempts (user_id, section_id, total_questions, time_taken)
-VALUES (?, ?, ?, ?)
-''',
-[session['user_id'], section_id, len(questions), time_taken])
-
-    # Check answers
-    for question in questions:
-        q_id = question['id']
-        correct_ans = question['correct_answer']
-        points = question['points']
-        total_points += points
-        
-        selected_ans = answers.get(str(q_id), '')
-        is_correct = selected_ans.upper() == correct_ans.upper()
-        
-        if is_correct:
-            correct_count += 1
-            earned_points += points
-        
-        # Store user response
-        execute_db('''INSERT INTO user_responses (attempt_id, question_id, selected_answer, is_correct)
-                      VALUES (?, ?, ?, ?)''',
-                   [attempt_id, q_id, selected_ans, is_correct])
-    
-    # Calculate percentage score
-    score = (earned_points / total_points * 100) if total_points > 0 else 0
-    
-    # Update attempt with score
-    execute_db('UPDATE test_attempts SET score = ?, correct_answers = ? WHERE id = ?',
-               [score, correct_count, attempt_id])
-    
-    # Generate AI recommendations after test
-    generate_ai_recommendations(session['user_id'])
-    
-    return jsonify({
-        'success': True,
-        'score': round(score, 2),
-        'correct': correct_count,
-        'total': len(questions),
-        'attempt_id': attempt_id
-    })
 @app.route('/api/user_scores', methods=['GET'])
 def api_user_scores():
     """Get user's test scores"""

@@ -106,6 +106,37 @@ async function handleLogout() {
   window.location.href = "/login"
 }
 
+
+async function loadCompanyTests() {
+  const tests = await apiCall("/api/company_tests")
+  const container = document.getElementById("company-tests")
+
+  if (!container) return
+
+  container.innerHTML = ""
+
+  tests.forEach((test) => {
+    const card = document.createElement("div")
+    card.className = "card"
+
+    card.innerHTML = `
+      <div class="card-header">${test.company_name}</div>
+      <div class="card-body">
+        <p>${test.description}</p>
+        <p><strong>Duration:</strong> ${test.total_duration} mins</p>
+        <p><strong>Total Questions:</strong> ${test.total_questions}</p>
+
+        <button class="btn btn-primary mt-20">
+          Start Full Test
+        </button>
+      </div>
+    `
+
+    container.appendChild(card)
+  })
+}
+
+
 // Load test sections
 async function loadTestSections() {
   const sections = await apiCall("/api/test_sections")
@@ -615,6 +646,8 @@ document.addEventListener("DOMContentLoaded", () => {
   } else if (path === "/admin") {
     loadAdminStudents()
     loadDepartmentStats()
+  } else if (path === "/company-tests") {
+    loadCompanyTests()
   }
 })
 
@@ -635,8 +668,9 @@ async function loadCompanyTests() {
     card.innerHTML = `
       <div class="card-header">${c.company_name}</div>
       <div class="card-body">
-        <p><strong>Duration:</strong> ${c.duration} mins</p>
-        <p><strong>Pattern:</strong> ${c.pattern}</p>
+        <p>${c.test_name}</p>
+        <p><strong>Duration:</strong> ${c.total_duration} mins</p>
+        <p><strong>Total Questions:</strong> ${c.total_questions}</p>
         <button class="btn btn-primary"
           onclick="startCompanyTest(${c.id})">
           Start Test
