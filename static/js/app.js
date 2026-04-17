@@ -3,6 +3,13 @@
 // API helper function
 console.log("App.js loaded successfully!");
 
+const resumeAnalyzerState = {
+  resumeText: "",
+  jobDescriptionText: "",
+  suggestions: null,
+  chatHistory: [],
+}
+
 async function apiCall(endpoint, method = "GET", body = null) {
   const options = {
     method: method,
@@ -482,11 +489,14 @@ async function loadResumeForm() {
     document.getElementById("full_name").value = resume.full_name || ""
     document.getElementById("email").value = resume.email || ""
     document.getElementById("phone").value = resume.phone || ""
+    document.getElementById("target_company").value = resume.target_company || ""
+    document.getElementById("target_role").value = resume.target_role || ""
     document.getElementById("education").value = resume.education || ""
     document.getElementById("skills").value = resume.skills || ""
     document.getElementById("experience").value = resume.experience || ""
     document.getElementById("projects").value = resume.projects || ""
     document.getElementById("certifications").value = resume.certifications || ""
+    document.getElementById("job_description").value = resume.job_description || ""
 
     // Show scores if available
     if (resume.overall_score) {
@@ -496,6 +506,7 @@ async function loadResumeForm() {
         format_score: resume.format_score,
         overall_score: resume.overall_score,
         feedback: resume.feedback,
+        jd_match_percentage: resume.jd_match_percentage || 0,
       })
     }
   }
@@ -504,25 +515,54 @@ async function loadResumeForm() {
 async function handleResumeSave(event) {
   event.preventDefault()
 
-  const resumeData = {
-    full_name: document.getElementById("full_name").value,
-    email: document.getElementById("email").value,
-    phone: document.getElementById("phone").value,
-    education: document.getElementById("education").value,
-    skills: document.getElementById("skills").value,
-    experience: document.getElementById("experience").value,
-    projects: document.getElementById("projects").value,
-    certifications: document.getElementById("certifications").value,
+  const formData = new FormData()
+  formData.append("full_name", document.getElementById("full_name").value)
+  formData.append("email", document.getElementById("email").value)
+  formData.append("phone", document.getElementById("phone").value)
+  formData.append("target_company", document.getElementById("target_company").value)
+  formData.append("target_role", document.getElementById("target_role").value)
+  formData.append("education", document.getElementById("education").value)
+  formData.append("skills", document.getElementById("skills").value)
+  formData.append("experience", document.getElementById("experience").value)
+  formData.append("projects", document.getElementById("projects").value)
+  formData.append("certifications", document.getElementById("certifications").value)
+  formData.append("job_description", document.getElementById("job_description").value)
+
+  const jdFileInput = document.getElementById("jd_file")
+  if (jdFileInput && jdFileInput.files.length) {
+    formData.append("jd_file", jdFileInput.files[0])
   }
 
-  const result = await apiCall("/api/save_resume", "POST", resumeData)
+  const response = await fetch("/api/save_resume", {
+    method: "POST",
+    body: formData,
+  })
+
+  const result = await response.json()
 
   if (result.success) {
     showAlert("Resume saved successfully!", "success")
     displayResumeScore(result.scores)
+    showResumeDownloads(result.download_pdf_url, result.download_doc_url)
+    const resumeForm = document.getElementById("resume-form")
+    if (resumeForm) {
+      resumeForm.reset()
+    }
   } else {
     showAlert("Failed to save resume", "error")
   }
+}
+
+function showResumeDownloads(pdfUrl, docUrl) {
+  const container = document.getElementById("resume-downloads")
+  const pdfLink = document.getElementById("download-pdf")
+  const docLink = document.getElementById("download-doc")
+
+  if (!container || !pdfLink || !docLink) return
+
+  pdfLink.href = pdfUrl
+  docLink.href = docUrl
+  container.classList.remove("hidden")
 }
 
 function displayResumeScore(scores) {
@@ -532,7 +572,7 @@ function displayResumeScore(scores) {
   container.innerHTML = `
         <h3 style="margin-bottom: 20px;">Resume Score Analysis</h3>
         
-        <div class="grid grid-3 mb-20">
+        <div class="grid grid-4 mb-20">
             <div class="stat-card">
                 <div class="stat-value">${scores.ats_score.toFixed(0)}</div>
                 <div class="stat-label">ATS Score</div>
@@ -544,6 +584,10 @@ function displayResumeScore(scores) {
             <div class="stat-card">
                 <div class="stat-value">${scores.format_score.toFixed(0)}</div>
                 <div class="stat-label">Format Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${(scores.jd_match_percentage || 0).toFixed(0)}%</div>
+                <div class="stat-label">JD Match</div>
             </div>
         </div>
         
@@ -559,6 +603,232 @@ function displayResumeScore(scores) {
             </div>
         </div>
     `
+}
+
+async function handleResumeAnalyzer(event) {
+  event.preventDefault()
+
+  const fileInput = document.getElementById("resume_file")
+  const jobDescriptionInput = document.getElementById("job_description")
+  const jdFileInput = document.getElementById("jd_file")
+  const resultsContainer = document.getElementById("resume-analyzer-results")
+
+  if (!fileInput || !fileInput.files.length) {
+    showAlert("Please select a resume file", "error")
+    return
+  }
+
+  const formData = new FormData()
+  formData.append("resume_file", fileInput.files[0])
+  formData.append("job_description", jobDescriptionInput ? jobDescriptionInput.value : "")
+  if (jdFileInput && jdFileInput.files.length) {
+    formData.append("jd_file", jdFileInput.files[0])
+  }
+
+  const response = await fetch("/api/analyze_resume", {
+    method: "POST",
+    body: formData,
+  })
+
+  const result = await response.json()
+
+  if (!result.success) {
+    showAlert(result.message || "Failed to analyze resume", "error")
+    return
+  }
+
+  resumeAnalyzerState.resumeText = result.resume_text || ""
+  resumeAnalyzerState.jobDescriptionText = result.job_description_text || ""
+  resumeAnalyzerState.suggestions = null
+  resumeAnalyzerState.chatHistory = []
+
+  resultsContainer.innerHTML = `
+        <div class="card-header">Analysis Results</div>
+        <div class="card-body">
+            <div class="grid grid-2 mb-20">
+                <div class="stat-card">
+                    <div class="stat-value">${result.match_percentage.toFixed(0)}%</div>
+                    <div class="stat-label">Skill Match</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${result.resume_score.toFixed(0)}</div>
+                    <div class="stat-label">Resume Score</div>
+                </div>
+            </div>
+            <div class="grid grid-2">
+                <div class="card">
+                    <div class="card-header">Extracted Skills</div>
+                    <div class="card-body">
+                        <p>${result.extracted_skills.length ? result.extracted_skills.join(", ") : "No skills detected"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Matched Skills</div>
+                    <div class="card-body">
+                        <p>${result.matched_skills.length ? result.matched_skills.join(", ") : "No matched skills found"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Missing Skills</div>
+                    <div class="card-body">
+                        <p>${result.missing_skills.length ? result.missing_skills.join(", ") : "No missing skills"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Extra Skills</div>
+                    <div class="card-body">
+                        <p>${result.extra_skills.length ? result.extra_skills.join(", ") : "No extra skills"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Keyword Overlap</div>
+                    <div class="card-body">
+                        <p>${result.keyword_overlap.length ? result.keyword_overlap.join(", ") : "No keyword overlap found"}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `
+
+  showAlert("Resume analyzed successfully!", "success")
+}
+
+function renderResumeAISuggestions(suggestions) {
+  const container = document.getElementById("resume-ai-suggestions")
+  if (!container) return
+
+  container.innerHTML = `
+        <div class="card-header">AI Suggestions</div>
+        <div class="card-body">
+            <div class="grid grid-2">
+                <div class="card">
+                    <div class="card-header">Skill Gaps</div>
+                    <div class="card-body">
+                        <p>${suggestions.skill_gaps.length ? suggestions.skill_gaps.join(", ") : "No major skill gaps identified"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Missing Keywords</div>
+                    <div class="card-body">
+                        <p>${suggestions.missing_keywords.length ? suggestions.missing_keywords.join(", ") : "No major keyword gaps identified"}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Section-wise Improvements</div>
+                    <div class="card-body">
+                        ${
+                          suggestions.section_wise_improvements.length
+                            ? suggestions.section_wise_improvements
+                                .map(
+                                  (item) =>
+                                    `<p><strong>${item.section}:</strong> ${item.improvement}</p>`,
+                                )
+                                .join("")
+                            : "<p>No section-wise improvements returned.</p>"
+                        }
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">ATS Optimization Tips</div>
+                    <div class="card-body">
+                        <p>${suggestions.ats_optimization_tips.length ? suggestions.ats_optimization_tips.join(", ") : "No ATS optimization tips returned."}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Shortlisting Probability</div>
+                    <div class="card-body">
+                        <p>${suggestions.shortlisting_probability_estimate}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+function renderResumeAIChat() {
+  const container = document.getElementById("resume-ai-chat-messages")
+  if (!container) return
+
+  if (!resumeAnalyzerState.chatHistory.length) {
+    container.innerHTML = "<p>Ask follow-up questions after generating AI suggestions.</p>"
+    return
+  }
+
+  container.innerHTML = resumeAnalyzerState.chatHistory
+    .map(
+      (message) => `
+        <div class="card mb-20">
+            <div class="card-header">${message.role === "user" ? "You" : "AI Coach"}</div>
+            <div class="card-body">
+                <p>${message.content}</p>
+            </div>
+        </div>
+      `,
+    )
+    .join("")
+}
+
+async function handleGetAISuggestions() {
+  if (!resumeAnalyzerState.resumeText || !resumeAnalyzerState.jobDescriptionText) {
+    showAlert("Analyze the resume against a job description first", "error")
+    return
+  }
+
+  const result = await apiCall("/api/resume_ai_suggestions", "POST", {
+    resume_text: resumeAnalyzerState.resumeText,
+    job_description_text: resumeAnalyzerState.jobDescriptionText,
+  })
+
+  if (!result.success) {
+    showAlert(result.message || "Failed to fetch AI suggestions", "error")
+    return
+  }
+
+  resumeAnalyzerState.suggestions = result.suggestions
+  renderResumeAISuggestions(result.suggestions)
+  renderResumeAIChat()
+  showAlert("AI suggestions generated successfully!", "success")
+}
+
+async function handleResumeAIChat(event) {
+  event.preventDefault()
+
+  const questionInput = document.getElementById("resume-ai-question")
+  const question = questionInput ? questionInput.value.trim() : ""
+
+  if (!resumeAnalyzerState.suggestions) {
+    showAlert("Generate AI suggestions before asking follow-up questions", "error")
+    return
+  }
+
+  if (!question) {
+    showAlert("Enter a follow-up question", "error")
+    return
+  }
+
+  resumeAnalyzerState.chatHistory.push({ role: "user", content: question })
+  renderResumeAIChat()
+
+  const result = await apiCall("/api/resume_ai_chat", "POST", {
+    resume_text: resumeAnalyzerState.resumeText,
+    job_description_text: resumeAnalyzerState.jobDescriptionText,
+    suggestions: resumeAnalyzerState.suggestions,
+    question,
+    chat_history: resumeAnalyzerState.chatHistory,
+  })
+
+  if (!result.success) {
+    resumeAnalyzerState.chatHistory.pop()
+    renderResumeAIChat()
+    showAlert(result.message || "Failed to fetch AI chat response", "error")
+    return
+  }
+
+  resumeAnalyzerState.chatHistory.push({ role: "assistant", content: result.answer })
+  if (questionInput) {
+    questionInput.value = ""
+  }
+  renderResumeAIChat()
 }
 
 // Admin functions
@@ -643,6 +913,19 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAIRecommendations()
   } else if (path === "/resume") {
     loadResumeForm()
+  } else if (path === "/resume-analyzer") {
+    const analyzerForm = document.getElementById("resume-analyzer-form")
+    const aiButton = document.getElementById("resume-ai-button")
+    const aiChatForm = document.getElementById("resume-ai-chat-form")
+    if (analyzerForm) {
+      analyzerForm.addEventListener("submit", handleResumeAnalyzer)
+    }
+    if (aiButton) {
+      aiButton.addEventListener("click", handleGetAISuggestions)
+    }
+    if (aiChatForm) {
+      aiChatForm.addEventListener("submit", handleResumeAIChat)
+    }
   } else if (path === "/admin") {
     loadAdminStudents()
     loadDepartmentStats()
@@ -679,8 +962,4 @@ async function loadCompanyTests() {
     `
     container.appendChild(card)
   })
-}
-
-if (path === "/company-tests") {
-  loadCompanyTests()
 }

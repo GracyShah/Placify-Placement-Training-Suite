@@ -22,6 +22,22 @@
 
     <div class="container">
         <h1 style="margin: 40px 0 30px;">Resume Builder</h1>
+
+        <div class="grid grid-2 mb-20">
+            <div class="card">
+                <div class="card-header">Resume Builder</div>
+                <div class="card-body">
+                    <p>Create and save your resume details.</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Resume Analyzer</div>
+                <div class="card-body">
+                    <p>Upload your resume and analyze your skills match score.</p>
+                    <a href="/resume-analyzer" class="btn btn-secondary mt-20">Open Resume Analyzer</a>
+                </div>
+            </div>
+        </div>
         
         <div class="grid grid-2">
             <div class="card">
@@ -41,6 +57,16 @@
                         <div class="form-group">
                             <label class="form-label">Phone</label>
                             <input type="tel" id="phone" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Target Company</label>
+                            <input type="text" id="target_company" class="form-input" placeholder="Company you are applying to">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Target Role</label>
+                            <input type="text" id="target_role" class="form-input" placeholder="Role you are applying for">
                         </div>
                         
                         <div class="form-group">
@@ -67,6 +93,16 @@
                             <label class="form-label">Certifications</label>
                             <textarea id="certifications" class="form-textarea" placeholder="Certifications and achievements..."></textarea>
                         </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Job Description</label>
+                            <textarea id="job_description" class="form-textarea" placeholder="Paste the job description here..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Upload Job Description (PDF/DOC/DOCX)</label>
+                            <input type="file" id="jd_file" class="form-input" accept=".pdf,.doc,.docx">
+                        </div>
                         
                         <button type="submit" class="btn btn-primary" style="width: 100%;">
                             Save & Analyze Resume
@@ -77,16 +113,23 @@
             
             <div>
                 <div id="resume-score">
-                    <div class="card">
-                        <div class="card-header">Resume Score</div>
-                        <div class="card-body">
-                            <p>Fill out the resume form and click "Save & Analyze Resume" to get your ATS score, keyword analysis, and improvement suggestions.</p>
+                        <div class="card">
+                            <div class="card-header">Resume Score</div>
+                            <div class="card-body">
+                                <p>Fill out the resume form and click "Save & Analyze Resume" to get your ATS score, keyword analysis, and improvement suggestions.</p>
+                            </div>
+                        </div>
+                        <div id="resume-downloads" class="card mt-20 hidden">
+                            <div class="card-header">Download Resume</div>
+                            <div class="card-body">
+                                <a id="download-pdf" href="#" class="btn btn-primary">Download PDF</a>
+                                <a id="download-doc" href="#" class="btn btn-secondary">Download DOC</a>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
     <script src="/static/js/app.js"></script>
 </body>

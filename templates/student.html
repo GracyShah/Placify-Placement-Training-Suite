@@ -13,6 +13,7 @@
             <ul class="nav-links">
                 <li><a href="/student">Dashboard</a></li>
                 <li><a href="/tests">Tests</a></li>
+                <li><a href="/company-tests">Company-wise Tests</a></li>
                 <li><a href="/dashboard">Performance</a></li>
                 <li><a href="/resume">Resume</a></li>
                 <li><a href="#" onclick="handleLogout()">Logout</a></li>
@@ -43,21 +44,51 @@
         </div>
         
         <div class="grid grid-2">
-            <div class="card">
-                <div class="card-header">Quick Actions</div>
-                <div class="card-body">
-                    <a href="/tests" class="btn btn-primary" style="display: block; text-align: center; margin-bottom: 15px;">
-                        Take a Test
-                    </a>
-                    <a href="/resume" class="btn btn-secondary" style="display: block; text-align: center; margin-bottom: 15px;">
-                        Build Resume
-                    </a>
-                    <a href="/dashboard" class="btn btn-secondary" style="display: block; text-align: center;">
-                        View Analytics
-                    </a>
+            <div>
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">Quick Actions</div>
+                    <div class="card-body">
+                        <div class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">Resume Analyzer</div>
+                                <div class="card-body">
+                                    <p>Upload and compare your resume with a job description.</p>
+                                    <a href="/resume-analyzer" class="btn btn-primary mt-20">Open</a>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">Resume Builder</div>
+                                <div class="card-body">
+                                    <p>Create and save your resume details in Placify.</p>
+                                    <a href="/resume" class="btn btn-secondary mt-20">Open</a>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">Take Test</div>
+                                <div class="card-body">
+                                    <p>Practice placement rounds and improve readiness.</p>
+                                    <a href="/tests" class="btn btn-secondary mt-20">Open</a>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">Company-wise Tests</div>
+                                <div class="card-body">
+                                    <p>Attempt company-specific placement test patterns.</p>
+                                    <a href="/company-tests" class="btn btn-secondary mt-20">Open</a>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">AI Suggestions</div>
+                                <div class="card-body">
+                                    <p>Get resume improvement suggestions and follow-up guidance.</p>
+                                    <a href="/resume-analyzer#resume-ai-suggestions" class="btn btn-secondary mt-20">Open</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <div class="card-header">Recent Activity</div>
                 <div class="card-body" id="recent-activity">

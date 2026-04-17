@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analyzer - PLACIFY</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">PLACIFY</div>
+            <ul class="nav-links">
+                <li><a href="/student">Dashboard</a></li>
+                <li><a href="/tests">Tests</a></li>
+                <li><a href="/dashboard">Performance</a></li>
+                <li><a href="/resume">Resume</a></li>
+                <li><a href="#" onclick="handleLogout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Resume Analyzer</h1>
+
+        <div class="grid grid-2 mb-20">
+            <div class="card">
+                <div class="card-header">Resume Section</div>
+                <div class="card-body">
+                    <a href="/resume" class="btn btn-secondary">Resume Builder</a>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Resume Analyzer</div>
+                <div class="card-body">
+                    <p>Upload your PDF or DOCX resume and view your analysis results.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-header">Analyze Resume</div>
+                <div class="card-body">
+                    <form id="resume-analyzer-form">
+                        <div class="form-group">
+                            <label for="resume_file" class="form-label">Resume Upload (PDF/DOCX)</label>
+                            <input type="file" id="resume_file" name="resume_file" class="form-input" accept=".pdf,.docx" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="job_description" class="form-label">Paste Job Description</label>
+                            <textarea id="job_description" name="job_description" class="form-textarea" placeholder="Paste the job description here..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="jd_file" class="form-label">Upload Job Description (PDF/DOC/DOCX)</label>
+                            <input type="file" id="jd_file" name="jd_file" class="form-input" accept=".pdf,.doc,.docx">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Analyze Resume vs JD</button>
+                        <button type="button" id="resume-ai-button" class="btn btn-secondary">Get AI Suggestions</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="resume-analyzer-results" class="card">
+                <div class="card-header">Analysis Results</div>
+                <div class="card-body">
+                    <p>Upload a resume, provide a job description by text or file, and click "Analyze Resume vs JD" to view comparison results.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="resume-ai-suggestions" class="card mt-20">
+            <div class="card-header">AI Suggestions</div>
+            <div class="card-body">
+                <p>Analyze your resume first, then click "Get AI Suggestions" to receive improvement guidance.</p>
+            </div>
+        </div>
+
+        <div class="card mt-20">
+            <div class="card-header">AI Follow-up Chat</div>
+            <div class="card-body">
+                <div id="resume-ai-chat-messages">
+                    <p>Ask follow-up questions after generating AI suggestions.</p>
+                </div>
+                <form id="resume-ai-chat-form" class="mt-20">
+                    <div class="form-group">
+                        <label for="resume-ai-question" class="form-label">Ask a follow-up question</label>
+                        <textarea id="resume-ai-question" class="form-textarea" placeholder="How can I improve my experience section for this role?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Question</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
