@@ -1,4 +1,4 @@
-TECHNICAL_SKILLS = [
+﻿TECHNICAL_SKILLS = [
     "python",
     "java",
     "c",

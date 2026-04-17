@@ -1,4 +1,4 @@
-class SkillMatcher:
+﻿class SkillMatcher:
     @staticmethod
     def match(resume_skills, job_skills):
         normalized_resume_skills = SkillMatcher._normalize_skills(resume_skills)

@@ -1,4 +1,4 @@
-TOPIC_TEST_BLUEPRINTS = {
+﻿TOPIC_TEST_BLUEPRINTS = {
     "Aptitude": {
         "description": "Quantitative aptitude practice focused on arithmetic, percentages, ratios, and data interpretation.",
         "time_limit": 18,
@@ -450,7 +450,7 @@ TOPIC_TEST_BLUEPRINTS = {
 
 COMPANY_TEST_SEED = {
     "amazon": {
-        "test_name": "Amazon Online Assessment – Full Placement Test",
+        "test_name": "Amazon Online Assessment â€“ Full Placement Test",
         "questions": [
             ("Aptitude", "What is 25% of 640?", {"A": "120", "B": "140", "C": "160", "D": "180"}, "C", "25% of 640 is 160."),
             ("Logical", "If CLOUD is coded as 59413, what is COULD?", {"A": "59314", "B": "59431", "C": "59413", "D": "53914"}, "B", "Rearrange the mapped letters to match COULD."),
@@ -465,7 +465,7 @@ COMPANY_TEST_SEED = {
         ],
     },
     "tcs": {
-        "test_name": "TCS NQT – Complete Mock Test",
+        "test_name": "TCS NQT â€“ Complete Mock Test",
         "questions": [
             ("Aptitude", "If 18 men can complete a work in 24 days, how many men are needed to finish it in 12 days?", {"A": "24", "B": "30", "C": "36", "D": "42"}, "C", "Work is constant, so men x days = 432. 432 / 12 = 36."),
             ("Logical", "Series: 1, 4, 9, 16, ?", {"A": "20", "B": "24", "C": "25", "D": "36"}, "C", "These are squares: 1, 2, 3, 4, so next is 5^2."),

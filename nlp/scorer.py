@@ -1,4 +1,4 @@
-class ResumeScorer:
+﻿class ResumeScorer:
     def __init__(self, skill_weight=0.8, project_weight=0.2, max_projects=5):
         self.skill_weight = skill_weight
         self.project_weight = project_weight
