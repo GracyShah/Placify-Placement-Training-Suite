@@ -1,3 +1,6 @@
+import sys
+sys.dont_write_bytecode = True
+
 import os
 import tempfile
 from pathlib import Path
@@ -7,9 +10,12 @@ from flask import Flask
 from db import init_app as init_db
 from routes import routes_bp
 
-
-BASE_DIR = Path(__file__).resolve().parent
-RUNTIME_DIR = Path(os.environ.get('PLACIFY_DATA_DIR', tempfile.gettempdir())) / 'placify'
+runtime_root = (
+    os.environ.get("PLACIFY_DATA_DIR")
+    or os.environ.get("RENDER_DISK_PATH")
+    or tempfile.gettempdir()
+)
+RUNTIME_DIR = Path(runtime_root) / "placify"
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.update(
