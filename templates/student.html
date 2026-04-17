@@ -21,10 +21,19 @@
         </div>
     </nav>
 
-    <div class="container">
-        <h1 style="margin: 40px 0 30px;">Student Dashboard</h1>
-        
-        <div class="grid grid-4" style="margin-bottom: 40px;">
+    <div class="container student-dashboard-page">
+        <section class="dashboard-hero">
+            <div>
+                <h1 class="dashboard-title">Student Dashboard</h1>
+                <p class="dashboard-subtitle">Access your placement tools, progress snapshots, and recent activity from one focused workspace.</p>
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <div class="dashboard-section-header">
+                <h2>Analytics Summary</h2>
+            </div>
+            <div class="grid grid-4 dashboard-stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="total-tests">0</div>
                 <div class="stat-label">Tests Taken</div>
@@ -41,60 +50,70 @@
                 <div class="stat-value" id="resume-score">0%</div>
                 <div class="stat-label">Resume Score</div>
             </div>
-        </div>
-        
-        <div class="grid grid-2">
-            <div>
-                <div class="card" style="margin-bottom: 20px;">
-                    <div class="card-header">Quick Actions</div>
-                    <div class="card-body">
-                        <div class="grid grid-2">
-                            <div class="card">
+            </div>
+        </section>
+
+        <div class="dashboard-panels">
+            <section class="card dashboard-actions-card">
+                <div class="dashboard-section-header">
+                    <h2>Actions</h2>
+                </div>
+                <div class="card-body">
+                    <div class="dashboard-actions-grid">
+                            <div class="card dashboard-action-card">
                                 <div class="card-header">Resume Analyzer</div>
                                 <div class="card-body">
                                     <p>Upload and compare your resume with a job description.</p>
                                     <a href="/resume-analyzer" class="btn btn-primary mt-20">Open</a>
                                 </div>
                             </div>
-                            <div class="card">
+                            <div class="card dashboard-action-card dashboard-action-card-featured">
                                 <div class="card-header">Resume Builder</div>
                                 <div class="card-body">
                                     <p>Create and save your resume details in Placify.</p>
-                                    <a href="/resume" class="btn btn-secondary mt-20">Open</a>
+                                    <a href="/resume" class="btn btn-primary mt-20">Open</a>
                                 </div>
                             </div>
-                            <div class="card">
+                            <div class="card dashboard-action-card dashboard-action-card-featured">
                                 <div class="card-header">Take Test</div>
                                 <div class="card-body">
                                     <p>Practice placement rounds and improve readiness.</p>
-                                    <a href="/tests" class="btn btn-secondary mt-20">Open</a>
+                                    <a href="/tests" class="btn btn-primary mt-20">Open</a>
                                 </div>
                             </div>
-                            <div class="card">
+                            <div class="card dashboard-action-card dashboard-action-card-featured">
+                                <div class="card-header">Performance</div>
+                                <div class="card-body">
+                                    <p>Review your scores, trends, and readiness insights.</p>
+                                    <a href="/dashboard" class="btn btn-primary mt-20">Open</a>
+                                </div>
+                            </div>
+                            <div class="card dashboard-action-card">
                                 <div class="card-header">Company-wise Tests</div>
                                 <div class="card-body">
                                     <p>Attempt company-specific placement test patterns.</p>
                                     <a href="/company-tests" class="btn btn-secondary mt-20">Open</a>
                                 </div>
                             </div>
-                            <div class="card">
+                            <div class="card dashboard-action-card">
                                 <div class="card-header">AI Suggestions</div>
                                 <div class="card-body">
                                     <p>Get resume improvement suggestions and follow-up guidance.</p>
                                     <a href="/resume-analyzer#resume-ai-suggestions" class="btn btn-secondary mt-20">Open</a>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="card">
-                <div class="card-header">Recent Activity</div>
-                <div class="card-body" id="recent-activity">
+            <section class="card dashboard-activity-card">
+                <div class="dashboard-section-header">
+                    <h2>Recent Activity</h2>
+                </div>
+                <div class="card-body dashboard-activity-body" id="recent-activity">
                     <p>Loading...</p>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 

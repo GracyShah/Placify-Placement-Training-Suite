@@ -10,6 +10,68 @@ const resumeAnalyzerState = {
   chatHistory: [],
 }
 
+const THEME_STORAGE_KEY = "theme"
+
+function applyTheme(theme) {
+  if (!document.body) return
+
+  const isDarkMode = theme === "dark"
+  document.body.classList.toggle("dark-mode", isDarkMode)
+
+  const themeToggle = document.getElementById("theme-toggle")
+  if (themeToggle) {
+    themeToggle.textContent = isDarkMode ? "Light Mode" : "Dark Mode"
+    themeToggle.setAttribute("aria-pressed", String(isDarkMode))
+    themeToggle.setAttribute("aria-label", isDarkMode ? "Switch to light mode" : "Switch to dark mode")
+  }
+}
+
+function getStoredTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"
+  } catch (error) {
+    console.warn("Theme preference unavailable:", error)
+    return "light"
+  }
+}
+
+function saveTheme(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch (error) {
+    console.warn("Unable to save theme preference:", error)
+  }
+}
+
+function toggleTheme() {
+  const nextTheme = document.body.classList.contains("dark-mode") ? "light" : "dark"
+  applyTheme(nextTheme)
+  saveTheme(nextTheme)
+}
+
+function ensureThemeToggle() {
+  const navLinks = document.querySelector(".nav-content .nav-links")
+  if (!navLinks || document.getElementById("theme-toggle")) return
+
+  const toggleItem = document.createElement("li")
+  toggleItem.className = "theme-toggle-item"
+
+  const toggleButton = document.createElement("button")
+  toggleButton.type = "button"
+  toggleButton.id = "theme-toggle"
+  toggleButton.className = "theme-toggle"
+  toggleButton.addEventListener("click", toggleTheme)
+
+  toggleItem.appendChild(toggleButton)
+  navLinks.appendChild(toggleItem)
+
+  applyTheme(getStoredTheme())
+}
+
+if (document.body) {
+  applyTheme(getStoredTheme())
+}
+
 async function apiCall(endpoint, method = "GET", body = null) {
   const options = {
     method: method,
@@ -114,182 +176,479 @@ async function handleLogout() {
 }
 
 
-async function loadCompanyTests() {
-  const tests = await apiCall("/api/company_tests")
-  const container = document.getElementById("company-tests")
-
-  if (!container) return
-
-  container.innerHTML = ""
-
-  tests.forEach((test) => {
-    const card = document.createElement("div")
-    card.className = "card"
-
-    card.innerHTML = `
-      <div class="card-header">${test.company_name}</div>
-      <div class="card-body">
-        <p>${test.description}</p>
-        <p><strong>Duration:</strong> ${test.total_duration} mins</p>
-        <p><strong>Total Questions:</strong> ${test.total_questions}</p>
-
-        <button class="btn btn-primary mt-20">
-          Start Full Test
-        </button>
-      </div>
-    `
-
-    container.appendChild(card)
-  })
-}
-
-
-// Load test sections
-async function loadTestSections() {
-  const sections = await apiCall("/api/test_sections")
-  const container = document.getElementById("test-sections")
-
-  if (!container) return
-
-  container.innerHTML = ""
-
-  sections.forEach((section) => {
-    const card = document.createElement("div")
-    card.className = "card"
-    card.innerHTML = `
-            <div class="card-header">${section.section_name}</div>
-            <div class="card-body">
-                <p>${section.description}</p>
-                <p><strong>Questions:</strong> ${section.total_questions}</p>
-                <p><strong>Time Limit:</strong> ${section.time_limit} minutes</p>
-                <button class="btn btn-primary mt-20"
-                  onclick="startTest(${section.id}, '${section.section_name}', ${section.time_limit})">
-                  Start Test
-                </button>
-
-
-            </div>
-        `
-    container.appendChild(card)
-  })
-}
-
-// Start test
 const currentTest = {
+  mode: null,
   sectionId: null,
   sectionName: "",
+  testId: null,
+  testName: "",
+  topicName: "",
+  topicKey: "",
+  companyTestId: null,
+  companyName: "",
   questions: [],
   answers: {},
   startTime: null,
-  duration: 0,        // seconds
-  timerInterval: null // interval reference
+  duration: 0,
+  timerInterval: null,
+  latestAttemptId: null,
+  latestSolutionUrl: null,
 }
 
-
-async function startTest(sectionId, sectionName, timeLimitMinutes) {
-  currentTest.sectionId = sectionId
-  currentTest.sectionName = sectionName
-  currentTest.startTime = Date.now()
+function resetCurrentTest() {
+  if (currentTest.timerInterval) {
+    clearInterval(currentTest.timerInterval)
+  }
+  currentTest.mode = null
+  currentTest.sectionId = null
+  currentTest.sectionName = ""
+  currentTest.testId = null
+  currentTest.testName = ""
+  currentTest.topicName = ""
+  currentTest.topicKey = ""
+  currentTest.companyTestId = null
+  currentTest.companyName = ""
+  currentTest.questions = []
   currentTest.answers = {}
-  currentTest.duration = timeLimitMinutes * 60 // convert to seconds
-
-  const questions = await apiCall(`/api/questions/${sectionId}`)
-  currentTest.questions = questions
-
-  displayQuestions()
-  startTimer() // ⏱ START TIMER
+  currentTest.startTime = null
+  currentTest.duration = 0
+  currentTest.timerInterval = null
+  currentTest.latestAttemptId = null
+  currentTest.latestSolutionUrl = null
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
 
-// Display questions
-function displayQuestions() {
-  const sectionsContainer = document.getElementById("test-sections")
-  const questionsContainer = document.getElementById("questions-container")
-  const timerContainer = document.getElementById("timer-container")
-  const submitContainer = document.getElementById("submit-container")
+function getTopicBackAction(topicKey) {
+  return `viewTopicTests('${topicKey}')`
+}
 
-  if (!sectionsContainer || !questionsContainer) return
+function getTestStatusBadge(status, attempted) {
+  return `<span class="status-pill ${attempted ? "status-attempted" : "status-open"}">${escapeHtml(status)}</span>`
+}
 
-  // Hide test cards
-  sectionsContainer.classList.add("hidden")
+function ensureConfirmModal() {
+  let modal = document.getElementById("confirm-modal")
+  if (modal) return modal
 
-  // Show timer + questions + submit
-  timerContainer.classList.remove("hidden")
-  questionsContainer.classList.remove("hidden")
-  submitContainer.classList.remove("hidden")
-
-  // Set test title
-  document.getElementById("test-title").textContent =
-    currentTest.sectionName + " Test"
-
-  questionsContainer.innerHTML = ""
-
-  currentTest.questions.forEach((question, index) => {
-    const questionCard = document.createElement("div")
-    questionCard.className = "question-card"
-    questionCard.innerHTML = `
-      <div class="question-text">
-        <strong>Q${index + 1}.</strong> ${question.question_text}
+  modal = document.createElement("div")
+  modal.id = "confirm-modal"
+  modal.className = "modal-overlay hidden"
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="card-header" id="confirm-modal-title">Confirm</div>
+      <div class="card-body">
+        <p id="confirm-modal-message"></p>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="confirm-modal-accept">Continue</button>
+          <button class="btn btn-secondary" id="confirm-modal-cancel">Cancel</button>
+        </div>
       </div>
-      <div class="options">
-        ${["A", "B", "C", "D"]
-          .map(
-            (opt) => `
-            <div class="option" onclick="selectAnswer(${question.id}, '${opt}', this)">
-              <strong>${opt}.</strong> ${question["option_" + opt.toLowerCase()]}
-            </div>
-          `
-          )
-          .join("")}
-      </div>
-    `
-    questionsContainer.appendChild(questionCard)
+    </div>
+  `
+  document.body.appendChild(modal)
+  return modal
+}
+
+function showConfirmModal(message, acceptLabel = "Continue", cancelLabel = "Cancel") {
+  const modal = ensureConfirmModal()
+  const messageEl = document.getElementById("confirm-modal-message")
+  const acceptBtn = document.getElementById("confirm-modal-accept")
+  const cancelBtn = document.getElementById("confirm-modal-cancel")
+
+  messageEl.textContent = message
+  acceptBtn.textContent = acceptLabel
+  cancelBtn.textContent = cancelLabel
+  modal.classList.remove("hidden")
+
+  return new Promise((resolve) => {
+    const cleanup = (value) => {
+      modal.classList.add("hidden")
+      acceptBtn.onclick = null
+      cancelBtn.onclick = null
+      modal.onclick = null
+      resolve(value)
+    }
+    acceptBtn.onclick = () => cleanup(true)
+    cancelBtn.onclick = () => cleanup(false)
+    modal.onclick = (event) => {
+      if (event.target === modal) cleanup(false)
+    }
   })
 }
 
-// Select answer
+function getTestPageElements() {
+  return {
+    title: document.getElementById("page-title"),
+    instruction: document.getElementById("test-instruction"),
+    sections: document.getElementById("test-sections"),
+    companyList: document.getElementById("company-tests"),
+    questions: document.getElementById("questions-container"),
+    timer: document.getElementById("timer-container"),
+    submit: document.getElementById("submit-container"),
+  }
+}
+
+function showTestCatalog() {
+  const elements = getTestPageElements()
+  if (!elements.sections) return
+  elements.sections.classList.remove("hidden")
+  if (elements.companyList) {
+    elements.companyList.classList.remove("hidden")
+  }
+  if (elements.questions) {
+    elements.questions.classList.add("hidden")
+    elements.questions.innerHTML = ""
+  }
+  if (elements.timer) {
+    elements.timer.classList.add("hidden")
+    elements.timer.classList.remove("timer-warning")
+  }
+  if (elements.submit) {
+    elements.submit.classList.add("hidden")
+  }
+}
+
+async function loadTestSections() {
+  const topics = await apiCall("/api/topic_tests")
+  const elements = getTestPageElements()
+  const container = elements.sections
+  if (!container) return
+
+  resetCurrentTest()
+  showTestCatalog()
+  if (elements.companyList) {
+    elements.companyList.classList.add("hidden")
+  }
+  if (elements.sections) {
+    elements.sections.classList.remove("hidden")
+  }
+  if (elements.title) elements.title.textContent = "Take Tests"
+  if (elements.instruction) {
+    elements.instruction.textContent = "Select a topic below to view its predefined tests. Each topic-test can be attempted only once, and solutions unlock after submission."
+  }
+
+  container.innerHTML = ""
+  topics.forEach((topic) => {
+    const card = document.createElement("div")
+    card.className = "card"
+    card.innerHTML = `
+      <div class="card-header">${topic.topic_name}</div>
+      <div class="card-body">
+        <p>${topic.description}</p>
+        <p><strong>Available Tests:</strong> ${topic.test_count}</p>
+        <button class="btn btn-primary mt-20" onclick="viewTopicTests('${topic.topic_key}')">View Tests</button>
+      </div>
+    `
+    container.appendChild(card)
+  })
+}
+
+async function viewTopicTests(topicKey) {
+  const topics = await apiCall("/api/topic_tests")
+  const topic = topics.find((item) => item.topic_key === topicKey)
+  const elements = getTestPageElements()
+  const container = elements.sections
+  if (!topic || !container) return
+
+  showTestCatalog()
+  if (elements.title) elements.title.textContent = `${topic.topic_name} Tests`
+  if (elements.instruction) {
+    elements.instruction.textContent = "Attempt any unlocked topic test once. Attempted tests stay visible with status and solution access."
+  }
+
+  container.innerHTML = `
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-body">
+        <button class="btn btn-secondary" onclick="loadTestSections()">Back to Topics</button>
+      </div>
+    </div>
+  `
+
+  topic.tests.forEach((test) => {
+    const attempted = Boolean(test.attempted)
+    const card = document.createElement("div")
+    card.className = "card"
+    card.innerHTML = `
+      <div class="card-header">${test.test_name}</div>
+      <div class="card-body">
+        <p>${test.description}</p>
+        <p><strong>Questions:</strong> ${test.question_count}</p>
+        <p><strong>Time Limit:</strong> ${test.time_limit} minutes</p>
+        <p><strong>Difficulty:</strong> ${(test.difficulty_tags || []).join(", ")}</p>
+        <p><strong>Status:</strong> ${getTestStatusBadge(test.status, attempted)}</p>
+        ${attempted && test.score !== null ? `<p><strong>Last Score:</strong> ${Number(test.score).toFixed(2)}%</p>` : ""}
+        <button class="btn btn-primary mt-20" ${attempted ? "disabled" : ""} onclick="startTopicTest('${test.test_id}')">
+          ${attempted ? "Attempted" : "Attempt Test"}
+        </button>
+        <button class="btn btn-secondary mt-20" ${test.solution_unlocked ? "" : "disabled"} onclick="showTopicSolutions('${test.test_id}')">
+          ${test.solution_unlocked ? "View Solutions" : "Solutions Locked"}
+        </button>
+      </div>
+    `
+    container.appendChild(card)
+  })
+}
+
+async function startTopicTest(testId) {
+  const result = await apiCall(`/api/topic_tests/${testId}/questions`)
+  if (!result.questions) {
+    showAlert(result.message || "Unable to load topic test", "error")
+    return
+  }
+
+  resetCurrentTest()
+  currentTest.mode = "topic"
+  currentTest.testId = result.test_id
+  currentTest.testName = result.test_name
+  currentTest.topicName = result.topic_name
+  currentTest.topicKey = result.topic_key
+  currentTest.questions = result.questions
+  currentTest.answers = {}
+  currentTest.startTime = Date.now()
+  currentTest.duration = result.time_limit * 60
+
+  renderActiveTest()
+  startTimer()
+}
+
+async function showTopicSolutions(testId) {
+  const result = await apiCall(`/api/topic_tests/${testId}/solutions`)
+  if (!result.questions) {
+    showAlert(result.message || "Unable to load solutions", "error")
+    return
+  }
+  displaySolutions(result, getTopicBackAction(result.topic_key), result.topic_name)
+}
+
+async function loadCompanyTests() {
+  const companyTests = await apiCall("/api/company_tests")
+  const container = document.getElementById("company-tests")
+  if (!container) return
+
+  showTestCatalog()
+  const elements = getTestPageElements()
+  if (elements.companyList) {
+    elements.companyList.classList.remove("hidden")
+  }
+  if (elements.sections) {
+    elements.sections.classList.add("hidden")
+    elements.sections.innerHTML = ""
+  }
+  if (elements.title) elements.title.textContent = "Company Wise Placement Tests"
+  if (elements.instruction) {
+    elements.instruction.textContent = "Select a company to view its predefined tests. Reattempts are allowed for company-wise tests, and solutions stay available after every attempt."
+  }
+  container.innerHTML = ""
+
+  const groupedCompanies = companyTests.reduce((acc, test) => {
+    const existing = acc[test.company_name] || {
+      company_name: test.company_name,
+      description: test.description,
+      total_tests: 0,
+      attempted_tests: 0,
+    }
+    existing.total_tests += 1
+    if (test.attempted) existing.attempted_tests += 1
+    acc[test.company_name] = existing
+    return acc
+  }, {})
+
+  Object.values(groupedCompanies).forEach((company) => {
+    const card = document.createElement("div")
+    card.className = "card"
+    card.innerHTML = `
+      <div class="card-header">${company.company_name}</div>
+      <div class="card-body">
+        <p>${company.description || "Structured company-wise placement assessment."}</p>
+        <p><strong>Available Tests:</strong> ${company.total_tests}</p>
+        <p><strong>Completed Tests:</strong> ${company.attempted_tests}</p>
+        <button class="btn btn-primary mt-20" onclick="viewCompanyTests('${company.company_name}')">View Tests</button>
+      </div>
+    `
+    container.appendChild(card)
+  })
+}
+
+async function viewCompanyTests(companyName) {
+  const tests = await apiCall("/api/company_tests")
+  const companyTests = tests.filter((item) => item.company_name === companyName)
+  const elements = getTestPageElements()
+  const container = elements.sections
+  if (!container) return
+
+  showTestCatalog()
+  if (elements.companyList) {
+    elements.companyList.classList.add("hidden")
+  }
+  elements.sections.classList.remove("hidden")
+  if (elements.title) elements.title.textContent = `${companyName} Tests`
+  if (elements.instruction) {
+    elements.instruction.textContent = "Each company test has a fixed question set. Reattempts are allowed, and solutions unlock after every attempt."
+  }
+
+  container.innerHTML = `
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-body">
+        <button class="btn btn-secondary" onclick="loadCompanyTests()">Back to Companies</button>
+      </div>
+    </div>
+  `
+
+  companyTests.forEach((test) => {
+    const attempted = Boolean(test.attempted)
+    const card = document.createElement("div")
+    card.className = "card"
+    card.innerHTML = `
+      <div class="card-header">${test.test_name}</div>
+      <div class="card-body">
+        <p>${test.description || "Structured company-wise placement assessment."}</p>
+        <p><strong>Questions:</strong> ${test.total_questions}</p>
+        <p><strong>Time Limit:</strong> ${test.total_duration} minutes</p>
+        <p><strong>Status:</strong> ${getTestStatusBadge(attempted ? "Attempted Earlier" : "Ready", attempted)}</p>
+        <p><strong>Attempts:</strong> ${test.attempt_count || 0}</p>
+        ${attempted && test.score !== null ? `<p><strong>Latest Score:</strong> ${Number(test.score).toFixed(2)}%</p>` : ""}
+        <button class="btn btn-primary mt-20" onclick="startCompanyTest(${test.id}, ${attempted ? "true" : "false"})">
+          ${attempted ? "Reattempt Test" : "Attempt Test"}
+        </button>
+        <button class="btn btn-secondary mt-20" ${attempted ? "" : "disabled"} onclick="showCompanySolutions(${test.id}${test.latest_attempt_id ? `, ${test.latest_attempt_id}` : ""})">
+          ${attempted ? "View Latest Solutions" : "Solutions Locked"}
+        </button>
+      </div>
+    `
+    container.appendChild(card)
+  })
+}
+
+async function startCompanyTest(companyTestId, alreadyAttempted = false) {
+  if (alreadyAttempted) {
+    const confirmed = await showConfirmModal("You have already attempted this test. Do you want to reattempt?", "Reattempt", "Cancel")
+    if (!confirmed) return
+  }
+
+  const result = await apiCall(`/api/company_tests/${companyTestId}/questions`)
+  if (!result.questions) {
+    showAlert(result.message || "Unable to load company test", "error")
+    return
+  }
+
+  resetCurrentTest()
+  currentTest.mode = "company"
+  currentTest.companyTestId = result.company_test_id
+  currentTest.companyName = result.company_name
+  currentTest.testName = result.test_name
+  currentTest.questions = result.questions.map((question) => ({
+    ...question,
+    question_id: question.id,
+  }))
+  currentTest.answers = {}
+  currentTest.startTime = Date.now()
+  currentTest.duration = result.time_limit * 60
+
+  renderActiveTest()
+  startTimer()
+}
+
+async function showCompanySolutions(companyTestId, attemptId = null) {
+  const suffix = attemptId ? `?attempt_id=${attemptId}` : ""
+  const result = await apiCall(`/api/company_tests/${companyTestId}/solutions${suffix}`)
+  if (!result.questions) {
+    showAlert(result.message || "Unable to load solutions", "error")
+    return
+  }
+  displaySolutions(result, "loadCompanyTests()", result.company_name)
+}
+
+function renderActiveTest() {
+  const elements = getTestPageElements()
+  if (!elements.sections || !elements.questions) return
+
+  elements.sections.classList.add("hidden")
+  if (elements.companyList) {
+    elements.companyList.classList.add("hidden")
+  }
+  elements.questions.classList.remove("hidden")
+  if (elements.timer) elements.timer.classList.remove("hidden")
+  if (elements.submit) elements.submit.classList.remove("hidden")
+  if (elements.title) elements.title.textContent = currentTest.testName
+  if (elements.instruction) {
+    elements.instruction.textContent = currentTest.mode === "company"
+      ? `Attempting ${currentTest.companyName} placement test. Reattempts are allowed and the latest solution set will remain accessible.`
+      : `Attempting ${currentTest.topicName}. This test can be attempted only once.`
+  }
+  const timerTitle = document.getElementById("test-title")
+  if (timerTitle) {
+    timerTitle.textContent = currentTest.mode === "company"
+      ? `${currentTest.companyName} - ${currentTest.testName}`
+      : `${currentTest.topicName} - ${currentTest.testName}`
+  }
+
+  elements.questions.innerHTML = currentTest.questions
+    .map(
+      (question, index) => `
+        <div class="question-card">
+          <div class="question-text">
+            <strong>Q${index + 1}.</strong> ${question.question_text}
+          </div>
+          <p><strong>Difficulty:</strong> ${question.difficulty || "Medium"}</p>
+          <div class="options">
+            ${["A", "B", "C", "D"]
+              .map(
+                (opt) => `
+                  <div class="option" onclick="selectAnswer('${question.question_id}', '${opt}', this)">
+                    <strong>${opt}.</strong> ${question["option_" + opt.toLowerCase()]}
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+        </div>
+      `,
+    )
+    .join("")
+}
+
 function selectAnswer(questionId, answer, element) {
-  // Remove selection from siblings
   const siblings = element.parentElement.querySelectorAll(".option")
-  siblings.forEach((sib) => sib.classList.remove("selected"))
-
-  // Add selection to clicked element
+  siblings.forEach((sibling) => sibling.classList.remove("selected"))
   element.classList.add("selected")
-
-  // Store answer
-  currentTest.answers[questionId] = answer
+  currentTest.answers[String(questionId)] = answer
 }
 
 function startTimer() {
   let remaining = currentTest.duration
   const timerEl = document.getElementById("timer")
+  if (!timerEl) return
 
   function updateTimer() {
     const min = Math.floor(remaining / 60)
     const sec = remaining % 60
+    timerEl.textContent = `Time Left: ${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
 
-    timerEl.textContent = `Time Left: ${min
-      .toString()
-      .padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
-
-    if (remaining <= 30) {
+    if (remaining <= 30 && timerEl.parentElement) {
       timerEl.parentElement.classList.add("timer-warning")
     }
-
     if (remaining <= 0) {
       clearInterval(currentTest.timerInterval)
+      currentTest.timerInterval = null
       showAlert("Time is up! Test auto-submitted.", "error")
-      submitTest() // 🚀 AUTO SUBMIT
+      submitTest()
+      return
     }
-
-    remaining--
+    remaining -= 1
   }
 
   updateTimer()
   currentTest.timerInterval = setInterval(updateTimer, 1000)
 }
 
-// Submit test
 async function submitTest() {
   if (currentTest.timerInterval) {
     clearInterval(currentTest.timerInterval)
@@ -297,47 +656,128 @@ async function submitTest() {
   }
 
   const timeTaken = Math.floor((Date.now() - currentTest.startTime) / 1000)
-
-  const result = await apiCall("/api/submit_test", "POST", {
+  let endpoint = "/api/submit_test"
+  let payload = {
     section_id: currentTest.sectionId,
     answers: currentTest.answers,
     time_taken: timeTaken,
-  })
-
-  if (result.success) {
-    displayTestResult(result)
-  } else {
-    showAlert("Failed to submit test", "error")
   }
+
+  if (currentTest.mode === "topic") {
+    endpoint = `/api/topic_tests/${currentTest.testId}/submit`
+    payload = { answers: currentTest.answers, time_taken: timeTaken }
+  } else if (currentTest.mode === "company") {
+    endpoint = `/api/company_tests/${currentTest.companyTestId}/submit`
+    payload = { answers: currentTest.answers, time_taken: timeTaken }
+  }
+
+  const result = await apiCall(endpoint, "POST", payload)
+  if (!result.success) {
+    showAlert(result.message || "Failed to submit test", "error")
+    return
+  }
+
+  currentTest.latestAttemptId = result.attempt_id || null
+  displayTestResult(result)
 }
 
+function renderPerformanceFeedback(feedback) {
+  if (!feedback) return ""
+  const categoryItems = Object.entries(feedback.category_breakdown || {})
+  const difficultyItems = Object.entries(feedback.difficulty_breakdown || {})
+  return `
+    <div class="card" style="margin-top: 20px; text-align: left;">
+      <div class="card-header">Performance Recommendations</div>
+      <div class="card-body">
+        <p>${feedback.summary || ""}</p>
+        ${
+          feedback.recommendations && feedback.recommendations.length
+            ? `<ul>${feedback.recommendations.map((item) => `<li>${item}</li>`).join("")}</ul>`
+            : ""
+        }
+        ${
+          categoryItems.length
+            ? `<p><strong>Topic Accuracy:</strong> ${categoryItems.map(([key, value]) => `${key}: ${value}%`).join(" | ")}</p>`
+            : ""
+        }
+        ${
+          difficultyItems.length
+            ? `<p><strong>Difficulty Accuracy:</strong> ${difficultyItems.map(([key, value]) => `${key}: ${value}%`).join(" | ")}</p>`
+            : ""
+        }
+      </div>
+    </div>
+  `
+}
 
-// Display test result
 function displayTestResult(result) {
-  const sectionsContainer = document.getElementById("test-sections")
-  const questionsContainer = document.getElementById("questions-container")
-  const timerContainer = document.getElementById("timer-container")
-  const submitContainer = document.getElementById("submit-container")
+  const elements = getTestPageElements()
+  showTestCatalog()
+  if (!elements.sections) return
+  if (elements.companyList) {
+    elements.companyList.classList.add("hidden")
+  }
 
-  // Hide test UI
-  questionsContainer.classList.add("hidden")
-  timerContainer.classList.add("hidden")
-  submitContainer.classList.add("hidden")
+  const backAction = currentTest.mode === "company" ? "loadCompanyTests()" : "loadTestSections()"
+  const topicBackAction = currentTest.topicKey ? getTopicBackAction(currentTest.topicKey) : "loadTestSections()"
+  const solutionAction = currentTest.mode === "company"
+    ? `showCompanySolutions(${currentTest.companyTestId}${currentTest.latestAttemptId ? `, ${currentTest.latestAttemptId}` : ""})`
+    : `showTopicSolutions('${currentTest.testId}')`
 
-  // Show sections container
-  sectionsContainer.classList.remove("hidden")
-
-  sectionsContainer.innerHTML = `
+  elements.sections.innerHTML = `
     <div class="score-display">
       <h2>Test Completed!</h2>
       <div class="score-circle">${result.score}%</div>
       <p style="font-size: 20px; margin: 20px 0;">
-        You answered <strong>${result.correct}</strong> out of 
+        You answered <strong>${result.correct}</strong> out of
         <strong>${result.total}</strong> questions correctly!
       </p>
-      <button class="btn btn-primary" onclick="loadTestSections()">Take Another Test</button>
-      <a href="/dashboard" class="btn btn-secondary ml-10">View Dashboard</a>
+      <button class="btn btn-primary" onclick="${currentTest.mode === "company" ? backAction : topicBackAction}">Back to Tests</button>
+      <button class="btn btn-secondary ml-10" onclick="${solutionAction}">View Solutions</button>
+      ${renderPerformanceFeedback(result.performance_feedback)}
     </div>
+  `
+
+  resetCurrentTest()
+}
+
+function displaySolutions(result, backAction, label) {
+  const elements = getTestPageElements()
+  if (!elements.sections) return
+  showTestCatalog()
+  if (elements.companyList) {
+    elements.companyList.classList.add("hidden")
+  }
+  if (elements.title) elements.title.textContent = `${label} Solutions`
+  if (elements.instruction) {
+    elements.instruction.textContent = "Solutions unlock after an attempt and remain available for review."
+  }
+
+  elements.sections.innerHTML = `
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-body">
+        <button class="btn btn-secondary" onclick="${backAction}">Back</button>
+        <p style="margin-top: 15px;"><strong>Score:</strong> ${Number(result.score || 0).toFixed(2)}%</p>
+      </div>
+    </div>
+    ${result.questions
+      .map(
+        (question, index) => `
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">Question ${index + 1}</div>
+            <div class="card-body">
+              ${question.section ? `<p><strong>Section:</strong> ${question.section}</p>` : ""}
+              ${question.difficulty ? `<p><strong>Difficulty:</strong> ${question.difficulty}</p>` : ""}
+              <p><strong>Question:</strong> ${question.question_text}</p>
+              <p><strong>Your Answer:</strong> ${question.selected_answer || "Not answered"}</p>
+              <p><strong>Correct Answer:</strong> ${question.correct_answer}</p>
+              <p><strong>Status:</strong> ${question.is_correct ? "Correct" : "Incorrect"}</p>
+              <p><strong>Explanation:</strong> ${question.explanation}</p>
+            </div>
+          </div>
+        `,
+      )
+      .join("")}
   `
 }
 
@@ -432,6 +872,12 @@ async function loadAIRecommendations() {
 
   const weakSections = JSON.parse(recommendations.weak_sections || "[]")
   const improvementAreas = JSON.parse(recommendations.improvement_areas || "[]")
+  const payload = recommendations.recommendation_payload ? JSON.parse(recommendations.recommendation_payload) : {}
+  const topicAccuracy = payload.topic_accuracy || []
+  const difficultyAnalysis = payload.difficulty_analysis || {}
+  const repeatedMistakes = payload.repeated_mistakes || []
+  const nextTests = payload.recommended_next_tests || []
+  const latestRecommendations = payload.latest_recommendations || []
 
   container.innerHTML = `
         <div class="card">
@@ -477,6 +923,63 @@ async function loadAIRecommendations() {
                 <p>${recommendations.practice_focus}</p>
             </div>
         </div>
+
+        ${
+          topicAccuracy.length
+            ? `
+            <div class="card">
+                <div class="card-header">Topic Accuracy</div>
+                <div class="card-body">
+                    <ul>
+                        ${topicAccuracy.map((item) => `<li>${item.topic}: ${item.accuracy}% accuracy across ${item.questions_seen} questions</li>`).join("")}
+                    </ul>
+                </div>
+            </div>
+        `
+            : ""
+        }
+
+        ${
+          Object.keys(difficultyAnalysis).length
+            ? `
+            <div class="card">
+                <div class="card-header">Difficulty Analysis</div>
+                <div class="card-body">
+                    <p>${Object.entries(difficultyAnalysis).map(([label, value]) => `${label}: ${value}%`).join(" | ")}</p>
+                </div>
+            </div>
+        `
+            : ""
+        }
+
+        ${
+          repeatedMistakes.length
+            ? `
+            <div class="card">
+                <div class="card-header">Repeated Mistakes</div>
+                <div class="card-body">
+                    <ul>
+                        ${repeatedMistakes.map((item) => `<li>${item}</li>`).join("")}
+                    </ul>
+                </div>
+            </div>
+        `
+            : ""
+        }
+
+        ${
+          latestRecommendations.length || nextTests.length
+            ? `
+            <div class="card">
+                <div class="card-header">Recommended Next Steps</div>
+                <div class="card-body">
+                    ${latestRecommendations.length ? `<ul>${latestRecommendations.map((item) => `<li>${item}</li>`).join("")}</ul>` : ""}
+                    ${nextTests.length ? `<p><strong>Suggested next tests:</strong> ${nextTests.join(", ")}</p>` : ""}
+                </div>
+            </div>
+        `
+            : ""
+        }
     `
 }
 
@@ -697,28 +1200,40 @@ function renderResumeAISuggestions(suggestions) {
   const container = document.getElementById("resume-ai-suggestions")
   if (!container) return
 
+  const skillGaps = suggestions.skill_gaps || []
+  const missingKeywords = suggestions.missing_keywords || []
+  const sectionImprovements = suggestions.section_wise_improvements || []
+  const atsTips = suggestions.ats_optimization_tips || []
+  const topStrengths = suggestions.top_strengths || []
+  const notice = suggestions.notice || ""
+
   container.innerHTML = `
         <div class="card-header">AI Suggestions</div>
         <div class="card-body">
+            ${
+              notice
+                ? `<div class="alert alert-info mb-20">${notice}</div>`
+                : ""
+            }
             <div class="grid grid-2">
                 <div class="card">
                     <div class="card-header">Skill Gaps</div>
                     <div class="card-body">
-                        <p>${suggestions.skill_gaps.length ? suggestions.skill_gaps.join(", ") : "No major skill gaps identified"}</p>
+                        <p>${skillGaps.length ? skillGaps.join(", ") : "No major skill gaps identified"}</p>
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-header">Missing Keywords</div>
                     <div class="card-body">
-                        <p>${suggestions.missing_keywords.length ? suggestions.missing_keywords.join(", ") : "No major keyword gaps identified"}</p>
+                        <p>${missingKeywords.length ? missingKeywords.join(", ") : "No major keyword gaps identified"}</p>
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-header">Section-wise Improvements</div>
                     <div class="card-body">
                         ${
-                          suggestions.section_wise_improvements.length
-                            ? suggestions.section_wise_improvements
+                          sectionImprovements.length
+                            ? sectionImprovements
                                 .map(
                                   (item) =>
                                     `<p><strong>${item.section}:</strong> ${item.improvement}</p>`,
@@ -731,13 +1246,20 @@ function renderResumeAISuggestions(suggestions) {
                 <div class="card">
                     <div class="card-header">ATS Optimization Tips</div>
                     <div class="card-body">
-                        <p>${suggestions.ats_optimization_tips.length ? suggestions.ats_optimization_tips.join(", ") : "No ATS optimization tips returned."}</p>
+                        <p>${atsTips.length ? atsTips.join(", ") : "No ATS optimization tips returned."}</p>
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-header">Shortlisting Probability</div>
                     <div class="card-body">
-                        <p>${suggestions.shortlisting_probability_estimate}</p>
+                        <p>${suggestions.shortlisting_probability_estimate || "Improvement estimate unavailable"}</p>
+                        ${suggestions.match_percentage ? `<p><strong>Match Score:</strong> ${Number(suggestions.match_percentage).toFixed(0)}%</p>` : ""}
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Top Strengths</div>
+                    <div class="card-body">
+                        <p>${topStrengths.length ? topStrengths.join(" ") : "No standout strengths detected yet."}</p>
                     </div>
                 </div>
             </div>
@@ -787,7 +1309,12 @@ async function handleGetAISuggestions() {
   resumeAnalyzerState.suggestions = result.suggestions
   renderResumeAISuggestions(result.suggestions)
   renderResumeAIChat()
-  showAlert("AI suggestions generated successfully!", "success")
+
+  if (result.suggestions && result.suggestions.notice) {
+    showAlert(result.suggestions.notice, "info")
+  } else {
+    showAlert("AI suggestions generated successfully!", "success")
+  }
 }
 
 async function handleResumeAIChat(event) {
@@ -903,6 +1430,9 @@ async function loadDepartmentStats() {
 
 // Initialize page based on current location
 document.addEventListener("DOMContentLoaded", () => {
+  applyTheme(getStoredTheme())
+  ensureThemeToggle()
+
   const path = window.location.pathname
 
   if (path === "/tests") {
@@ -935,31 +1465,3 @@ document.addEventListener("DOMContentLoaded", () => {
 })
 
 
-//////////////////////////////////////
-//company tests page
-async function loadCompanyTests() {
-  const companies = await apiCall("/api/company_tests")
-
-  const container = document.getElementById("company-tests")
-  if (!container) return
-
-  container.innerHTML = ""
-
-  companies.forEach(c => {
-    const card = document.createElement("div")
-    card.className = "card"
-    card.innerHTML = `
-      <div class="card-header">${c.company_name}</div>
-      <div class="card-body">
-        <p>${c.test_name}</p>
-        <p><strong>Duration:</strong> ${c.total_duration} mins</p>
-        <p><strong>Total Questions:</strong> ${c.total_questions}</p>
-        <button class="btn btn-primary"
-          onclick="startCompanyTest(${c.id})">
-          Start Test
-        </button>
-      </div>
-    `
-    container.appendChild(card)
-  })
-}

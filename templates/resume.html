@@ -20,26 +20,18 @@
         </div>
     </nav>
 
-    <div class="container">
-        <h1 style="margin: 40px 0 30px;">Resume Builder</h1>
+    <div class="container resume-builder-page">
+        <section class="resume-builder-hero">
+            <div class="resume-builder-hero-copy">
+                <h1>Resume Builder (ATS Optimized)</h1>
+                <p>Build a polished, recruiter-friendly resume and review your ATS-aligned score insights in one streamlined flow.</p>
+            </div>
+            <div class="resume-builder-hero-actions">
+                <a href="/resume-analyzer" class="btn btn-primary">Analyze Resume &rarr;</a>
+            </div>
+        </section>
 
-        <div class="grid grid-2 mb-20">
-            <div class="card">
-                <div class="card-header">Resume Builder</div>
-                <div class="card-body">
-                    <p>Create and save your resume details.</p>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-header">Resume Analyzer</div>
-                <div class="card-body">
-                    <p>Upload your resume and analyze your skills match score.</p>
-                    <a href="/resume-analyzer" class="btn btn-secondary mt-20">Open Resume Analyzer</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid grid-2">
+        <div class="grid grid-2 resume-builder-layout">
             <div class="card">
                 <div class="card-header">Build Your Resume</div>
                 <div class="card-body">
@@ -120,9 +112,10 @@
                             </div>
                         </div>
                         <div id="resume-downloads" class="card mt-20 hidden">
-                            <div class="card-header">Download Resume</div>
-                            <div class="card-body">
-                                <a id="download-pdf" href="#" class="btn btn-primary">Download PDF</a>
+                            <div class="card-header">Resume Download</div>
+                            <div class="card-body resume-download-actions">
+                                <p>Your ATS-optimized resume is ready to download using the existing generated file.</p>
+                                <a id="download-pdf" href="#" class="btn btn-primary">Download Resume (ATS-Optimized PDF)</a>
                                 <a id="download-doc" href="#" class="btn btn-secondary">Download DOC</a>
                             </div>
                         </div>

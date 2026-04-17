@@ -1,4 +1,13 @@
-﻿TOPIC_TEST_BLUEPRINTS = {
+TOPIC_DISPLAY_NAMES = {
+    "Aptitude": "Aptitude",
+    "Logical": "Logical Reasoning",
+    "Verbal": "Verbal Ability",
+    "DSA Basics": "DSA Basics",
+    "SQL": "SQL",
+}
+
+
+TOPIC_TEST_BLUEPRINTS = {
     "Aptitude": {
         "description": "Quantitative aptitude practice focused on arithmetic, percentages, ratios, and data interpretation.",
         "time_limit": 18,
@@ -450,79 +459,131 @@
 
 COMPANY_TEST_SEED = {
     "amazon": {
-        "test_name": "Amazon Online Assessment â€“ Full Placement Test",
-        "questions": [
-            ("Aptitude", "What is 25% of 640?", {"A": "120", "B": "140", "C": "160", "D": "180"}, "C", "25% of 640 is 160."),
-            ("Logical", "If CLOUD is coded as 59413, what is COULD?", {"A": "59314", "B": "59431", "C": "59413", "D": "53914"}, "B", "Rearrange the mapped letters to match COULD."),
-            ("Verbal", "Choose the correct sentence.", {"A": "Each of the students have submitted.", "B": "Each of the students has submitted.", "C": "Each students has submitted.", "D": "Each student have submitted."}, "B", "Each takes a singular verb."),
-            ("DSA Basics", "Which data structure is ideal for DFS?", {"A": "Queue", "B": "Stack", "C": "Heap", "D": "Trie"}, "B", "Depth-first traversal uses a stack."),
-            ("SQL", "Which clause is used to combine rows with the same values?", {"A": "ORDER BY", "B": "HAVING", "C": "GROUP BY", "D": "UNION"}, "C", "GROUP BY groups rows for aggregation."),
-            ("Aptitude", "A number is increased by 20% and then decreased by 20%. What is the net change?", {"A": "No change", "B": "4% decrease", "C": "4% increase", "D": "2% decrease"}, "B", "1.2 x 0.8 = 0.96, so net 4% decrease."),
-            ("Logical", "Find the odd one out: API, SDK, JSON, Banana", {"A": "API", "B": "SDK", "C": "JSON", "D": "Banana"}, "D", "Banana is unrelated."),
-            ("Verbal", "Choose the synonym of 'robust'.", {"A": "fragile", "B": "strong", "C": "brief", "D": "silent"}, "B", "Robust means strong."),
-            ("DSA Basics", "Average-case lookup in a hash table is typically:", {"A": "O(1)", "B": "O(log n)", "C": "O(n)", "D": "O(n log n)"}, "A", "Hash tables target constant average-time lookup."),
-            ("SQL", "Which query returns unique values?", {"A": "SELECT UNIQUE", "B": "SELECT ONLY", "C": "SELECT DISTINCT", "D": "SELECT FILTER"}, "C", "DISTINCT removes duplicates."),
+        "company_name": "Amazon",
+        "description": "Amazon-focused mock assessments with aptitude, reasoning, verbal, DSA, and SQL coverage.",
+        "tests": [
+            {
+                "test_name": "Amazon Online Assessment Set 1",
+                "total_duration": 45,
+                "questions": [
+                    ("Aptitude", "What is 25% of 640?", {"A": "120", "B": "140", "C": "160", "D": "180"}, "C", "25% of 640 is 160."),
+                    ("Logical Reasoning", "If CLOUD is coded as 59413, what is COULD?", {"A": "59314", "B": "59431", "C": "59413", "D": "53914"}, "B", "Rearrange the mapped letters to match COULD."),
+                    ("Verbal Ability", "Choose the correct sentence.", {"A": "Each of the students have submitted.", "B": "Each of the students has submitted.", "C": "Each students has submitted.", "D": "Each student have submitted."}, "B", "Each takes a singular verb."),
+                    ("DSA Basics", "Which data structure is ideal for DFS?", {"A": "Queue", "B": "Stack", "C": "Heap", "D": "Trie"}, "B", "Depth-first traversal uses a stack."),
+                    ("SQL", "Which clause is used to combine rows with the same values?", {"A": "ORDER BY", "B": "HAVING", "C": "GROUP BY", "D": "UNION"}, "C", "GROUP BY groups rows for aggregation."),
+                ],
+            },
+            {
+                "test_name": "Amazon Online Assessment Set 2",
+                "total_duration": 45,
+                "questions": [
+                    ("Aptitude", "A number is increased by 20% and then decreased by 20%. What is the net change?", {"A": "No change", "B": "4% decrease", "C": "4% increase", "D": "2% decrease"}, "B", "1.2 x 0.8 = 0.96, so net 4% decrease."),
+                    ("Logical Reasoning", "Find the odd one out: API, SDK, JSON, Banana", {"A": "API", "B": "SDK", "C": "JSON", "D": "Banana"}, "D", "Banana is unrelated."),
+                    ("Verbal Ability", "Choose the synonym of 'robust'.", {"A": "fragile", "B": "strong", "C": "brief", "D": "silent"}, "B", "Robust means strong."),
+                    ("DSA Basics", "Average-case lookup in a hash table is typically:", {"A": "O(1)", "B": "O(log n)", "C": "O(n)", "D": "O(n log n)"}, "A", "Hash tables target constant average-time lookup."),
+                    ("SQL", "Which query returns unique values?", {"A": "SELECT UNIQUE", "B": "SELECT ONLY", "C": "SELECT DISTINCT", "D": "SELECT FILTER"}, "C", "DISTINCT removes duplicates."),
+                ],
+            },
         ],
     },
     "tcs": {
-        "test_name": "TCS NQT â€“ Complete Mock Test",
-        "questions": [
-            ("Aptitude", "If 18 men can complete a work in 24 days, how many men are needed to finish it in 12 days?", {"A": "24", "B": "30", "C": "36", "D": "42"}, "C", "Work is constant, so men x days = 432. 432 / 12 = 36."),
-            ("Logical", "Series: 1, 4, 9, 16, ?", {"A": "20", "B": "24", "C": "25", "D": "36"}, "C", "These are squares: 1, 2, 3, 4, so next is 5^2."),
-            ("Verbal", "Fill in the blank: He insisted ___ paying the bill.", {"A": "for", "B": "on", "C": "at", "D": "to"}, "B", "The correct usage is insisted on."),
-            ("DSA Basics", "Which structure is used for BFS in graphs?", {"A": "Stack", "B": "Queue", "C": "Array", "D": "Hash map"}, "B", "Breadth-first search uses a queue."),
-            ("SQL", "Which command adds a new column to an existing table?", {"A": "UPDATE TABLE", "B": "CHANGE TABLE", "C": "ALTER TABLE", "D": "MODIFY TABLE"}, "C", "ALTER TABLE is used to change table structure."),
-            ("Aptitude", "Simple interest on Rs.5000 at 8% per annum for 2 years is:", {"A": "Rs.400", "B": "Rs.600", "C": "Rs.800", "D": "Rs.1000"}, "C", "SI = PRT/100 = 5000 x 8 x 2 / 100 = 800."),
-            ("Logical", "Pointing to a photograph, Mira says, 'He is my mother's only brother's son.' How is the person related to Mira?", {"A": "Brother", "B": "Cousin", "C": "Uncle", "D": "Nephew"}, "B", "Mother's brother's son is a cousin."),
-            ("Verbal", "Choose the antonym of 'optimistic'.", {"A": "hopeful", "B": "confident", "C": "pessimistic", "D": "calm"}, "C", "Pessimistic is the opposite."),
-            ("DSA Basics", "The worst-case complexity of linear search is:", {"A": "O(1)", "B": "O(log n)", "C": "O(n)", "D": "O(n log n)"}, "C", "It may inspect every element."),
-            ("SQL", "Which function returns the total of numeric values?", {"A": "COUNT()", "B": "TOTAL()", "C": "AVG()", "D": "SUM()"}, "D", "SUM() adds numeric values."),
+        "company_name": "TCS",
+        "description": "TCS NQT-style mock assessments for campus placement preparation.",
+        "tests": [
+            {
+                "test_name": "TCS NQT Mock Set 1",
+                "total_duration": 50,
+                "questions": [
+                    ("Aptitude", "If 18 men can complete a work in 24 days, how many men are needed to finish it in 12 days?", {"A": "24", "B": "30", "C": "36", "D": "42"}, "C", "Work is constant, so men x days = 432. 432 / 12 = 36."),
+                    ("Logical Reasoning", "Series: 1, 4, 9, 16, ?", {"A": "20", "B": "24", "C": "25", "D": "36"}, "C", "These are squares: 1, 2, 3, 4, so next is 5^2."),
+                    ("Verbal Ability", "Fill in the blank: He insisted ___ paying the bill.", {"A": "for", "B": "on", "C": "at", "D": "to"}, "B", "The correct usage is insisted on."),
+                    ("DSA Basics", "Which structure is used for BFS in graphs?", {"A": "Stack", "B": "Queue", "C": "Array", "D": "Hash map"}, "B", "Breadth-first search uses a queue."),
+                    ("SQL", "Which command adds a new column to an existing table?", {"A": "UPDATE TABLE", "B": "CHANGE TABLE", "C": "ALTER TABLE", "D": "MODIFY TABLE"}, "C", "ALTER TABLE is used to change table structure."),
+                ],
+            },
+            {
+                "test_name": "TCS NQT Mock Set 2",
+                "total_duration": 50,
+                "questions": [
+                    ("Aptitude", "Simple interest on Rs.5000 at 8% per annum for 2 years is:", {"A": "Rs.400", "B": "Rs.600", "C": "Rs.800", "D": "Rs.1000"}, "C", "SI = PRT/100 = 5000 x 8 x 2 / 100 = 800."),
+                    ("Logical Reasoning", "Pointing to a photograph, Mira says, 'He is my mother's only brother's son.' How is the person related to Mira?", {"A": "Brother", "B": "Cousin", "C": "Uncle", "D": "Nephew"}, "B", "Mother's brother's son is a cousin."),
+                    ("Verbal Ability", "Choose the antonym of 'optimistic'.", {"A": "hopeful", "B": "confident", "C": "pessimistic", "D": "calm"}, "C", "Pessimistic is the opposite."),
+                    ("DSA Basics", "The worst-case complexity of linear search is:", {"A": "O(1)", "B": "O(log n)", "C": "O(n)", "D": "O(n log n)"}, "C", "It may inspect every element."),
+                    ("SQL", "Which function returns the total of numeric values?", {"A": "COUNT()", "B": "TOTAL()", "C": "AVG()", "D": "SUM()"}, "D", "SUM() adds numeric values."),
+                ],
+            },
         ],
     },
     "infosys": {
-        "test_name": "Infosys Certified Specialist Exam",
-        "questions": [
-            ("Aptitude", "A car covers 180 km in 3 hours. What is its speed?", {"A": "45 km/h", "B": "50 km/h", "C": "55 km/h", "D": "60 km/h"}, "D", "Speed = distance / time = 180 / 3."),
-            ("Logical", "Choose the missing term: AZ, BY, CX, ?", {"A": "DV", "B": "DW", "C": "EV", "D": "EW"}, "B", "The first letter increases, second decreases: A-Z, B-Y, C-X, D-W."),
-            ("Verbal", "Choose the correctly ordered sentence: 'rarely / errors / production / in / unnoticed / go'", {"A": "Errors go unnoticed in production rarely.", "B": "Rarely errors go unnoticed in production.", "C": "Errors rarely go unnoticed in production.", "D": "In production go unnoticed errors rarely."}, "C", "This is the natural and grammatically correct order."),
-            ("DSA Basics", "Which sorting algorithm divides the array and merges sorted halves?", {"A": "Bubble sort", "B": "Merge sort", "C": "Selection sort", "D": "Insertion sort"}, "B", "Merge sort uses divide and conquer."),
-            ("SQL", "Which statement is used to remove specific rows from a table?", {"A": "REMOVE", "B": "DELETE", "C": "DROP", "D": "TRUNCATE"}, "B", "DELETE removes selected rows."),
-            ("Aptitude", "The average of 5 numbers is 18. If four numbers are 14, 16, 18, and 20, the fifth number is:", {"A": "20", "B": "22", "C": "24", "D": "26"}, "B", "Total is 90. Known sum is 68, so the fifth number is 22."),
-            ("Logical", "If all pens are tools and some tools are expensive, which statement is certain?", {"A": "All tools are pens", "B": "Some pens are expensive", "C": "All pens are tools", "D": "No pen is expensive"}, "C", "Only the first relation is guaranteed."),
-            ("Verbal", "Choose the word closest in meaning to 'meticulous'.", {"A": "careless", "B": "precise", "C": "quick", "D": "ordinary"}, "B", "Meticulous means very careful and precise."),
-            ("DSA Basics", "In a max-heap, the root node contains:", {"A": "smallest element", "B": "median element", "C": "largest element", "D": "random element"}, "C", "Max-heaps keep the maximum at the root."),
-            ("SQL", "Which clause is evaluated first in a simple SELECT query?", {"A": "SELECT", "B": "ORDER BY", "C": "FROM", "D": "HAVING"}, "C", "Logically, SQL starts from FROM before filtering and projecting."),
+        "company_name": "Infosys",
+        "description": "Infosys-style placement mocks with balanced fundamentals and technical questions.",
+        "tests": [
+            {
+                "test_name": "Infosys Mock Set 1",
+                "total_duration": 45,
+                "questions": [
+                    ("Aptitude", "A car covers 180 km in 3 hours. What is its speed?", {"A": "45 km/h", "B": "50 km/h", "C": "55 km/h", "D": "60 km/h"}, "D", "Speed = distance / time = 180 / 3."),
+                    ("Logical Reasoning", "Choose the missing term: AZ, BY, CX, ?", {"A": "DV", "B": "DW", "C": "EV", "D": "EW"}, "B", "The first letter increases, second decreases: A-Z, B-Y, C-X, D-W."),
+                    ("Verbal Ability", "Choose the correctly ordered sentence: 'rarely / errors / production / in / unnoticed / go'", {"A": "Errors go unnoticed in production rarely.", "B": "Rarely errors go unnoticed in production.", "C": "Errors rarely go unnoticed in production.", "D": "In production go unnoticed errors rarely."}, "C", "This is the natural and grammatically correct order."),
+                    ("DSA Basics", "Which sorting algorithm divides the array and merges sorted halves?", {"A": "Bubble sort", "B": "Merge sort", "C": "Selection sort", "D": "Insertion sort"}, "B", "Merge sort uses divide and conquer."),
+                    ("SQL", "Which statement is used to remove specific rows from a table?", {"A": "REMOVE", "B": "DELETE", "C": "DROP", "D": "TRUNCATE"}, "B", "DELETE removes selected rows."),
+                ],
+            },
+            {
+                "test_name": "Infosys Mock Set 2",
+                "total_duration": 45,
+                "questions": [
+                    ("Aptitude", "The average of 5 numbers is 18. If four numbers are 14, 16, 18, and 20, the fifth number is:", {"A": "20", "B": "22", "C": "24", "D": "26"}, "B", "Total is 90. Known sum is 68, so the fifth number is 22."),
+                    ("Logical Reasoning", "If all pens are tools and some tools are expensive, which statement is certain?", {"A": "All tools are pens", "B": "Some pens are expensive", "C": "All pens are tools", "D": "No pen is expensive"}, "C", "Only the first relation is guaranteed."),
+                    ("Verbal Ability", "Choose the word closest in meaning to 'meticulous'.", {"A": "careless", "B": "precise", "C": "quick", "D": "ordinary"}, "B", "Meticulous means very careful and precise."),
+                    ("DSA Basics", "In a max-heap, the root node contains:", {"A": "smallest element", "B": "median element", "C": "largest element", "D": "random element"}, "C", "Max-heaps keep the maximum at the root."),
+                    ("SQL", "Which clause is evaluated first in a simple SELECT query?", {"A": "SELECT", "B": "ORDER BY", "C": "FROM", "D": "HAVING"}, "C", "Logically, SQL starts from FROM before filtering and projecting."),
+                ],
+            },
         ],
     },
 }
+
+
+def get_question_difficulty(question_order, total_questions):
+    if question_order <= max(2, total_questions // 3):
+        return "Easy"
+    if question_order >= total_questions:
+        return "Hard"
+    return "Medium"
 
 
 def build_topic_test_catalog():
     catalog = []
     for topic_name, config in TOPIC_TEST_BLUEPRINTS.items():
         tests = []
+        topic_key = topic_name.lower().replace(" ", "-")
+        display_name = TOPIC_DISPLAY_NAMES.get(topic_name, topic_name)
         for test_number, indexes in enumerate(config["question_indexes"], start=1):
             questions = []
             for order, question_index in enumerate(indexes, start=1):
                 question = config["bank"][question_index]
                 questions.append(
                     {
-                        "question_id": f"{topic_name.lower().replace(' ', '-')}-test-{test_number}-q{order}",
+                        "question_id": f"{topic_key}-test-{test_number}-q{order}",
                         "question_key": question["question_key"],
                         "question_text": question["question_text"],
                         "options": question["options"],
                         "correct_answer": question["correct_answer"],
                         "explanation": question["explanation"],
+                        "difficulty": get_question_difficulty(order, len(indexes)),
                         "points": 1,
                     }
                 )
 
             tests.append(
                 {
-                    "test_id": f"{topic_name.lower().replace(' ', '-')}-test-{test_number}",
-                    "topic_name": topic_name,
-                    "test_name": f"{topic_name} Test {test_number}",
-                    "description": f"{topic_name} fixed practice set {test_number}.",
+                    "test_id": f"{topic_key}-test-{test_number}",
+                    "topic_name": display_name,
+                    "topic_key": topic_key,
+                    "topic_source": topic_name,
+                    "test_name": f"{display_name} Test {test_number}",
+                    "description": f"{display_name} fixed practice set {test_number}.",
                     "time_limit": config["time_limit"],
                     "questions": questions,
                 }
@@ -530,7 +591,9 @@ def build_topic_test_catalog():
 
         catalog.append(
             {
-                "topic_name": topic_name,
+                "topic_name": display_name,
+                "topic_key": topic_key,
+                "topic_source": topic_name,
                 "description": config["description"],
                 "test_count": config["test_count"],
                 "tests": tests,

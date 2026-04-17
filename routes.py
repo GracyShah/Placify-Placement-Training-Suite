@@ -20,7 +20,8 @@ from db import (
     get_admin_students,
     get_company_test,
     get_company_test_attempt,
-    get_company_test_questions,
+    get_company_test_attempt_by_id,
+    get_company_test_questions as db_get_company_test_questions,
     get_company_test_responses,
     get_company_tests_for_user,
     get_latest_ai_recommendation,
@@ -36,6 +37,7 @@ from db import (
     get_user_scores,
     reset_demo_data,
     save_ai_recommendation,
+    save_resume_ai_suggestions,
     upsert_resume_for_user,
 )
 from utils import (
@@ -45,6 +47,7 @@ from utils import (
     TOPIC_TEST_MAP,
     build_ai_recommendation_payload,
     build_tailored_resume,
+    build_test_performance_feedback,
     calculate_resume_score,
     compute_capability_match_scores,
     count_projects,
@@ -178,6 +181,7 @@ def api_topic_tests():
     for topic in TOPIC_TEST_CATALOG:
         topic_payload = {
             "topic_name": topic["topic_name"],
+            "topic_key": topic.get("topic_key"),
             "description": topic["description"],
             "test_count": topic["test_count"],
             "tests": [],
@@ -191,10 +195,12 @@ def api_topic_tests():
                     "description": test["description"],
                     "question_count": len(test["questions"]),
                     "time_limit": test["time_limit"],
+                    "difficulty_tags": sorted({question.get("difficulty", "Medium") for question in test["questions"]}),
                     "attempted": bool(attempt),
                     "status": "Attempted" if attempt else "Not Attempted",
                     "score": attempt["score"] if attempt else None,
                     "completed_at": attempt["completed_at"] if attempt else None,
+                    "solution_unlocked": bool(attempt),
                 }
             )
         payload.append(topic_payload)
@@ -217,6 +223,7 @@ def api_topic_test_questions(test_id):
             "test_id": test["test_id"],
             "test_name": test["test_name"],
             "topic_name": test["topic_name"],
+            "topic_key": test["topic_key"],
             "time_limit": test["time_limit"],
             "questions": [
                 {
@@ -226,6 +233,7 @@ def api_topic_test_questions(test_id):
                     "option_b": question["options"]["B"],
                     "option_c": question["options"]["C"],
                     "option_d": question["options"]["D"],
+                    "difficulty": question.get("difficulty", "Medium"),
                 }
                 for question in test["questions"]
             ],
@@ -260,7 +268,14 @@ def api_submit_topic_test(test_id):
     score = round((correct_count / len(test["questions"])) * 100, 2) if test["questions"] else 0
     finalize_topic_attempt(attempt_id, score, correct_count)
     _generate_ai_recommendations(session["user_id"])
-    return jsonify({"success": True, "score": score, "correct": correct_count, "total": len(test["questions"]), "attempt_id": attempt_id, "test_name": test["test_name"], "topic_name": test["topic_name"]})
+    topic_group = next((topic for topic in TOPIC_TEST_CATALOG if topic["topic_key"] == test["topic_key"]), {})
+    recommendation_pool = [
+        other_test["test_name"]
+        for other_test in topic_group.get("tests", [])
+        if other_test["test_id"] != test_id and not get_topic_attempt(session["user_id"], other_test["test_id"])
+    ]
+    performance_feedback = build_test_performance_feedback(test["test_name"], test["topic_name"], test["questions"], answers, recommendation_pool)
+    return jsonify({"success": True, "score": score, "correct": correct_count, "total": len(test["questions"]), "attempt_id": attempt_id, "test_name": test["test_name"], "topic_name": test["topic_name"], "topic_key": test["topic_key"], "performance_feedback": performance_feedback})
 
 
 @routes_bp.route("/api/topic_tests/<test_id>/solutions", methods=["GET"])
@@ -281,6 +296,7 @@ def api_topic_test_solutions(test_id):
         "test_id": test["test_id"],
         "test_name": test["test_name"],
         "topic_name": test["topic_name"],
+        "topic_key": test["topic_key"],
         "score": attempt["score"],
         "correct_answers": attempt["correct_answers"],
         "completed_at": attempt["completed_at"],
@@ -292,6 +308,7 @@ def api_topic_test_solutions(test_id):
                 "selected_answer": response_map.get(question["question_key"], {}).get("selected_answer", ""),
                 "is_correct": bool(response_map.get(question["question_key"], {}).get("is_correct", 0)),
                 "explanation": question["explanation"],
+                "difficulty": question.get("difficulty", "Medium"),
             }
             for question in test["questions"]
         ],
@@ -350,26 +367,32 @@ def api_company_tests():
 def api_company_test_questions(company_test_id):
     if "user_id" not in session:
         return jsonify({"success": False, "message": "Not logged in"}), 401
-    if get_company_test_attempt(session["user_id"], company_test_id):
-        return jsonify({"success": False, "message": "This company-wise test has already been attempted."}), 400
 
     test = get_company_test(company_test_id)
-    questions = get_company_test_questions(company_test_id)
+    questions = db_get_company_test_questions(company_test_id)
+    latest_attempt = get_company_test_attempt(session["user_id"], company_test_id)
     if not test or not questions:
         return jsonify({"success": False, "message": "Questions not available for this company test yet."}), 404
 
-    return jsonify({"company_test_id": company_test_id, "company_name": test["company_name"], "test_name": test["test_name"], "time_limit": test["total_duration"], "questions": [dict(row) for row in questions]})
+    return jsonify({
+        "company_test_id": company_test_id,
+        "company_name": test["company_name"],
+        "test_name": test["test_name"],
+        "time_limit": test["total_duration"],
+        "already_attempted": bool(latest_attempt),
+        "latest_attempt_id": latest_attempt["id"] if latest_attempt else None,
+        "questions": [dict(row) for row in questions],
+    })
 
 
 @routes_bp.route("/api/company_tests/<int:company_test_id>/submit", methods=["POST"])
 def api_submit_company_test(company_test_id):
     if "user_id" not in session:
         return jsonify({"success": False, "message": "Not logged in"}), 401
-    if get_company_test_attempt(session["user_id"], company_test_id):
-        return jsonify({"success": False, "message": "Each company-wise test can only be attempted once."}), 400
 
-    questions = get_company_test_questions(company_test_id, include_answers=True)
-    if not questions:
+    questions = db_get_company_test_questions(company_test_id, include_answers=True)
+    test = get_company_test(company_test_id)
+    if not questions or not test:
         return jsonify({"success": False, "message": "Questions not available for this company test yet."}), 404
 
     data = request.get_json() or {}
@@ -387,7 +410,10 @@ def api_submit_company_test(company_test_id):
 
     score = round((correct_count / len(questions)) * 100, 2) if questions else 0
     finalize_company_test_attempt(attempt_id, score)
-    return jsonify({"success": True, "score": score, "correct": correct_count, "total": len(questions), "attempt_id": attempt_id})
+    _generate_ai_recommendations(session["user_id"])
+    recommendation_pool = sorted({row["section"] for row in questions if row["section"]})
+    performance_feedback = build_test_performance_feedback(test["test_name"], test["company_name"], questions, answers, recommendation_pool)
+    return jsonify({"success": True, "score": score, "correct": correct_count, "total": len(questions), "attempt_id": attempt_id, "performance_feedback": performance_feedback})
 
 
 @routes_bp.route("/api/company_tests/<int:company_test_id>/solutions", methods=["GET"])
@@ -395,15 +421,17 @@ def api_company_test_solutions(company_test_id):
     if "user_id" not in session:
         return jsonify({"success": False, "message": "Not logged in"}), 401
 
-    attempt = get_company_test_attempt(session["user_id"], company_test_id)
+    requested_attempt_id = request.args.get("attempt_id", type=int)
+    attempt = get_company_test_attempt_by_id(session["user_id"], company_test_id, requested_attempt_id) if requested_attempt_id else get_company_test_attempt(session["user_id"], company_test_id)
     if not attempt:
         return jsonify({"success": False, "message": "Solutions are available only after attempting the company-wise test."}), 403
 
     test = get_company_test(company_test_id)
-    questions = get_company_test_questions(company_test_id, include_answers=True)
+    questions = db_get_company_test_questions(company_test_id, include_answers=True)
     response_map = {row["question_id"]: dict(row) for row in get_company_test_responses(attempt["id"])}
 
     return jsonify({
+        "attempt_id": attempt["id"],
         "company_name": test["company_name"],
         "test_name": test["test_name"],
         "score": attempt["score"],
@@ -412,6 +440,7 @@ def api_company_test_solutions(company_test_id):
             {
                 "section": row["section"],
                 "question_text": row["question_text"],
+                "difficulty": row["difficulty"] if row["difficulty"] else "Medium",
                 "options": {"A": row["option_a"], "B": row["option_b"], "C": row["option_c"], "D": row["option_d"]},
                 "correct_answer": row["correct_answer"],
                 "selected_answer": response_map.get(row["id"], {}).get("selected_answer", ""),
@@ -567,13 +596,15 @@ def api_resume_ai_suggestions():
     if not resume_text or not job_description_text:
         return jsonify({"success": False, "message": "Resume text and job description are required"}), 400
 
-    try:
-        suggestions = generate_resume_ai_suggestions(resume_text, job_description_text)
-    except ValueError as error:
-        return jsonify({"success": False, "message": str(error)}), 400
-    except Exception as error:
-        return jsonify({"success": False, "message": f"AI suggestion generation failed: {error}"}), 500
-    return jsonify({"success": True, "suggestions": suggestions})
+    suggestions = generate_resume_ai_suggestions(resume_text, job_description_text)
+    save_resume_ai_suggestions(
+        session["user_id"],
+        resume_text,
+        job_description_text,
+        json.dumps(suggestions),
+        suggestions.get("source", "nlp"),
+    )
+    return jsonify({"success": True, "suggestions": suggestions, "message": suggestions.get("notice")})
 
 
 @routes_bp.route("/api/resume_ai_chat", methods=["POST"])
@@ -652,4 +683,5 @@ def _generate_ai_recommendations(user_id):
         json.dumps(payload["improvement_areas"]),
         payload["practice_focus"],
         payload["readiness_score"],
+        json.dumps(payload),
     )

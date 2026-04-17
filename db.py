@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
     weak_sections TEXT,
     improvement_areas TEXT,
     practice_focus TEXT,
+    recommendation_payload TEXT,
     readiness_score DECIMAL(5,2) DEFAULT 0,
     generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -158,6 +159,7 @@ CREATE TABLE IF NOT EXISTS company_test_questions (
     correct_answer TEXT,
     coding_input TEXT,
     coding_output TEXT,
+    difficulty TEXT DEFAULT "Medium",
     points INTEGER DEFAULT 1,
     FOREIGN KEY (company_test_id) REFERENCES company_tests(id)
 );
@@ -227,9 +229,11 @@ DEFAULT_USERS = [
 ]
 
 DEFAULT_COMPANY_TESTS = [
-    {"company_name": "Amazon", "description": "Amazon company-specific placement assessment.", "test_name": "Amazon Online Assessment - Full Placement Test", "legacy_test_name": "Amazon Online Assessment - Full Placement Test", "total_duration": 90, "total_questions": 65},
-    {"company_name": "TCS", "description": "TCS placement readiness assessment.", "test_name": "TCS NQT - Complete Mock Test", "legacy_test_name": "TCS NQT - Complete Mock Test", "total_duration": 120, "total_questions": 75},
-    {"company_name": "Infosys", "description": "Infosys company-specific placement assessment.", "test_name": "Infosys Certified Specialist Exam", "legacy_test_name": "Infosys Certified Specialist Exam", "total_duration": 100, "total_questions": 70},
+    {
+        "company_name": seed["company_name"],
+        "description": seed["description"],
+    }
+    for seed in COMPANY_TEST_SEED.values()
 ]
 
 
@@ -303,7 +307,16 @@ def _ensure_resume_columns(connection):
         "target_company": "ALTER TABLE resumes ADD COLUMN target_company TEXT",
         "target_role": "ALTER TABLE resumes ADD COLUMN target_role TEXT",
         "job_description": "ALTER TABLE resumes ADD COLUMN job_description TEXT",
+        "ai_suggestions_payload": "ALTER TABLE resumes ADD COLUMN ai_suggestions_payload TEXT",
+        "ai_suggestions_source": "ALTER TABLE resumes ADD COLUMN ai_suggestions_source TEXT",
+        "ai_suggestions_updated_at": "ALTER TABLE resumes ADD COLUMN ai_suggestions_updated_at TIMESTAMP",
     }
+    recommendation_columns = {row["name"] for row in connection.execute("PRAGMA table_info(ai_recommendations)").fetchall()}
+    company_question_columns = {row["name"] for row in connection.execute("PRAGMA table_info(company_test_questions)").fetchall()}
+    if "difficulty" not in company_question_columns:
+        connection.execute("ALTER TABLE company_test_questions ADD COLUMN difficulty TEXT DEFAULT 'Medium'")
+    if "recommendation_payload" not in recommendation_columns:
+        connection.execute("ALTER TABLE ai_recommendations ADD COLUMN recommendation_payload TEXT")
     for column_name, statement in missing_columns.items():
         if column_name not in existing_columns:
             connection.execute(statement)
@@ -337,21 +350,7 @@ def _seed_default_users(connection):
 def _seed_company_tests(connection):
     for seed in DEFAULT_COMPANY_TESTS:
         connection.execute("INSERT OR IGNORE INTO companies (company_name, description) VALUES (?, ?)", (seed["company_name"], seed["description"]))
-        company = connection.execute("SELECT id FROM companies WHERE company_name = ?", (seed["company_name"],)).fetchone()
-        existing_test = connection.execute(
-            "SELECT id FROM company_tests WHERE company_id = ? AND (test_name = ? OR test_name = ?)",
-            (company["id"], seed["test_name"], seed["legacy_test_name"]),
-        ).fetchone()
-        if existing_test:
-            connection.execute(
-                "UPDATE company_tests SET test_name = ?, total_duration = ?, total_questions = ? WHERE id = ?",
-                (seed["test_name"], seed["total_duration"], seed["total_questions"], existing_test["id"]),
-            )
-        else:
-            connection.execute(
-                "INSERT INTO company_tests (company_id, test_name, total_duration, total_questions) VALUES (?, ?, ?, ?)",
-                (company["id"], seed["test_name"], seed["total_duration"], seed["total_questions"]),
-            )
+        connection.execute("UPDATE companies SET description = ? WHERE company_name = ?", (seed["description"], seed["company_name"]))
 
 
 def _seed_company_test_questions(connection):
@@ -359,26 +358,34 @@ def _seed_company_test_questions(connection):
         company = connection.execute("SELECT id FROM companies WHERE lower(company_name) = ?", (company_key.lower(),)).fetchone()
         if not company:
             continue
-        company_test = connection.execute(
-            "SELECT id FROM company_tests WHERE company_id = ? AND test_name IN (?, ?)",
-            (company["id"], seed["test_name"], seed["test_name"].replace("-", "-")),
-        ).fetchone()
-        if not company_test:
-            connection.execute(
-                "INSERT INTO company_tests (company_id, test_name, total_duration, total_questions) VALUES (?, ?, ?, ?)",
-                (company["id"], seed["test_name"].replace("-", "-"), 90, len(seed["questions"])),
-            )
+        for test_seed in seed["tests"]:
             company_test = connection.execute(
-                "SELECT id FROM company_tests WHERE company_id = ? AND test_name IN (?, ?)",
-                (company["id"], seed["test_name"], seed["test_name"].replace("-", "-")),
+                "SELECT id FROM company_tests WHERE company_id = ? AND test_name = ?",
+                (company["id"], test_seed["test_name"]),
             ).fetchone()
-        if connection.execute("SELECT COUNT(*) FROM company_test_questions WHERE company_test_id = ?", (company_test["id"],)).fetchone()[0]:
-            continue
-        for section, question_text, options, correct_answer, explanation in seed["questions"]:
-            connection.execute(
-                "INSERT INTO company_test_questions (company_test_id, section, question_type, question_text, option_a, option_b, option_c, option_d, correct_answer, coding_output, points) VALUES (?, ?, 'mcq', ?, ?, ?, ?, ?, ?, ?, 1)",
-                (company_test["id"], section, question_text, options["A"], options["B"], options["C"], options["D"], correct_answer, explanation),
-            )
+            if not company_test:
+                connection.execute(
+                    "INSERT INTO company_tests (company_id, test_name, total_duration, total_questions) VALUES (?, ?, ?, ?)",
+                    (company["id"], test_seed["test_name"], test_seed["total_duration"], len(test_seed["questions"])),
+                )
+                company_test = connection.execute(
+                    "SELECT id FROM company_tests WHERE company_id = ? AND test_name = ?",
+                    (company["id"], test_seed["test_name"]),
+                ).fetchone()
+            else:
+                connection.execute(
+                    "UPDATE company_tests SET total_duration = ?, total_questions = ? WHERE id = ?",
+                    (test_seed["total_duration"], len(test_seed["questions"]), company_test["id"]),
+                )
+            if connection.execute("SELECT COUNT(*) FROM company_test_questions WHERE company_test_id = ?", (company_test["id"],)).fetchone()[0]:
+                continue
+            total_questions = len(test_seed["questions"])
+            for index, (section, question_text, options, correct_answer, explanation) in enumerate(test_seed["questions"], start=1):
+                difficulty = "Easy" if index <= max(2, total_questions // 3) else ("Hard" if index > total_questions - 1 else "Medium")
+                connection.execute(
+                    "INSERT INTO company_test_questions (company_test_id, section, question_type, question_text, option_a, option_b, option_c, option_d, correct_answer, coding_output, difficulty, points) VALUES (?, ?, 'mcq', ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                    (company_test["id"], section, question_text, options["A"], options["B"], options["C"], options["D"], correct_answer, explanation, difficulty),
+                )
 
 
 def get_user_by_credentials(username, password):
@@ -397,7 +404,7 @@ def get_topic_attempts_for_user(user_id):
 
 
 def get_topic_attempt(user_id, test_key):
-    return _fetch_one("SELECT id, score, correct_answers, completed_at FROM topic_test_attempts WHERE user_id = ? AND test_key = ?", (user_id, test_key))
+    return _fetch_one("SELECT id, score, correct_answers, completed_at, time_taken FROM topic_test_attempts WHERE user_id = ? AND test_key = ?", (user_id, test_key))
 
 
 def create_topic_attempt(user_id, test_key, topic_name, test_name, total_questions, time_taken, completed_at):
@@ -451,25 +458,59 @@ def finalize_test_attempt(attempt_id, score, correct_answers):
 
 
 def get_company_tests_for_user(user_id):
-    return _fetch_all(
+    seeded_test_names = {
+        test_seed["test_name"]
+        for company_seed in COMPANY_TEST_SEED.values()
+        for test_seed in company_seed["tests"]
+    }
+    rows = _fetch_all(
         """
-        SELECT ct.id, c.company_name, ct.test_name, ct.total_duration,
-               COALESCE(COUNT(ctq.id), ct.total_questions) AS total_questions,
-               cta.score, cta.completed_at,
-               CASE WHEN cta.id IS NULL THEN 0 ELSE 1 END AS attempted
+        SELECT ct.id, c.company_name, c.description, ct.test_name, ct.total_duration,
+               COALESCE(question_counts.question_count, ct.total_questions) AS total_questions,
+               latest_attempt.id AS latest_attempt_id,
+               latest_attempt.score,
+               latest_attempt.completed_at,
+               COALESCE(attempt_counts.attempt_count, 0) AS attempt_count,
+               CASE WHEN latest_attempt.id IS NULL THEN 0 ELSE 1 END AS attempted
         FROM company_tests ct
         JOIN companies c ON ct.company_id = c.id
-        LEFT JOIN company_test_questions ctq ON ctq.company_test_id = ct.id
-        LEFT JOIN company_test_attempts cta ON cta.company_test_id = ct.id AND cta.user_id = ?
-        GROUP BY ct.id, c.company_name, ct.test_name, ct.total_duration, ct.total_questions, cta.id
-        ORDER BY c.company_name
+        LEFT JOIN (
+            SELECT company_test_id, COUNT(*) AS question_count
+            FROM company_test_questions
+            GROUP BY company_test_id
+        ) question_counts ON question_counts.company_test_id = ct.id
+        LEFT JOIN (
+            SELECT company_test_id, COUNT(*) AS attempt_count
+            FROM company_test_attempts
+            WHERE user_id = ?
+            GROUP BY company_test_id
+        ) attempt_counts ON attempt_counts.company_test_id = ct.id
+        LEFT JOIN company_test_attempts latest_attempt ON latest_attempt.id = (
+            SELECT cta2.id
+            FROM company_test_attempts cta2
+            WHERE cta2.user_id = ? AND cta2.company_test_id = ct.id
+            ORDER BY cta2.completed_at DESC, cta2.id DESC
+            LIMIT 1
+        )
+        ORDER BY c.company_name, ct.test_name
         """,
-        (user_id,),
+        (user_id, user_id),
     )
+    return [row for row in rows if row["test_name"] in seeded_test_names]
 
 
 def get_company_test_attempt(user_id, company_test_id):
-    return _fetch_one("SELECT id, score, completed_at FROM company_test_attempts WHERE user_id = ? AND company_test_id = ?", (user_id, company_test_id))
+    return _fetch_one(
+        "SELECT id, score, completed_at, time_taken FROM company_test_attempts WHERE user_id = ? AND company_test_id = ? ORDER BY completed_at DESC, id DESC LIMIT 1",
+        (user_id, company_test_id),
+    )
+
+
+def get_company_test_attempt_by_id(user_id, company_test_id, attempt_id):
+    return _fetch_one(
+        "SELECT id, score, completed_at, time_taken FROM company_test_attempts WHERE user_id = ? AND company_test_id = ? AND id = ?",
+        (user_id, company_test_id, attempt_id),
+    )
 
 
 def get_company_test(company_test_id):
@@ -482,11 +523,11 @@ def get_company_test(company_test_id):
 def get_company_test_questions(company_test_id, include_answers=False):
     if include_answers:
         return _fetch_all(
-            "SELECT id, section, question_text, option_a, option_b, option_c, option_d, correct_answer, coding_output, points FROM company_test_questions WHERE company_test_id = ? ORDER BY id",
+            "SELECT id, section, question_text, option_a, option_b, option_c, option_d, correct_answer, coding_output, difficulty, points FROM company_test_questions WHERE company_test_id = ? ORDER BY id",
             (company_test_id,),
         )
     return _fetch_all(
-        "SELECT id, section, question_text, option_a, option_b, option_c, option_d FROM company_test_questions WHERE company_test_id = ? ORDER BY id",
+        "SELECT id, section, question_text, option_a, option_b, option_c, option_d, difficulty FROM company_test_questions WHERE company_test_id = ? ORDER BY id",
         (company_test_id,),
     )
 
@@ -525,9 +566,30 @@ def get_user_scores(user_id):
                tta.topic_name || ' - ' || tta.test_name AS section_name
         FROM topic_test_attempts tta
         WHERE tta.user_id = ?
+        UNION ALL
+        SELECT cta.score,
+               COALESCE(correct_counts.correct_answers, 0) AS correct_answers,
+               COALESCE(question_counts.total_questions, 0) AS total_questions,
+               cta.completed_at,
+               c.company_name || ' - ' || ct.test_name AS section_name
+        FROM company_test_attempts cta
+        JOIN company_tests ct ON cta.company_test_id = ct.id
+        JOIN companies c ON ct.company_id = c.id
+        LEFT JOIN (
+            SELECT ctr.attempt_id, COUNT(*) AS correct_answers
+            FROM company_test_responses ctr
+            WHERE ctr.is_correct = 1
+            GROUP BY ctr.attempt_id
+        ) correct_counts ON correct_counts.attempt_id = cta.id
+        LEFT JOIN (
+            SELECT company_test_id, COUNT(*) AS total_questions
+            FROM company_test_questions
+            GROUP BY company_test_id
+        ) question_counts ON question_counts.company_test_id = ct.id
+        WHERE cta.user_id = ?
         ORDER BY completed_at DESC
         """,
-        (user_id, user_id),
+        (user_id, user_id, user_id),
     )
 
 
@@ -544,37 +606,65 @@ def get_section_performance(user_id):
             SELECT tta.topic_name AS section_name, tta.score AS score
             FROM topic_test_attempts tta
             WHERE tta.user_id = ?
+            UNION ALL
+            SELECT c.company_name || ' Company Tests' AS section_name, cta.score AS score
+            FROM company_test_attempts cta
+            JOIN company_tests ct ON cta.company_test_id = ct.id
+            JOIN companies c ON ct.company_id = c.id
+            WHERE cta.user_id = ?
         ) combined_scores
         GROUP BY section_name
         """,
-        (user_id, user_id),
+        (user_id, user_id, user_id),
     )
 
 
 def get_recommendation_performance(user_id):
     return _fetch_all(
         """
-        SELECT section_name, AVG(score) AS avg_score
+        SELECT source_type, topic_name, test_name, section_name, category_name, difficulty, is_correct, score, completed_at
         FROM (
-            SELECT ts.section_name AS section_name, ta.score AS score
-            FROM test_attempts ta
-            JOIN test_sections ts ON ta.section_id = ts.id
-            WHERE ta.user_id = ?
-            UNION ALL
-            SELECT tta.topic_name AS section_name, tta.score AS score
+            SELECT
+                'topic' AS source_type,
+                tta.topic_name AS topic_name,
+                tta.test_name AS test_name,
+                tta.topic_name AS section_name,
+                ttr.question_key AS category_name,
+                NULL AS difficulty,
+                CAST(ttr.is_correct AS INTEGER) AS is_correct,
+                tta.score AS score,
+                tta.completed_at AS completed_at
             FROM topic_test_attempts tta
+            JOIN topic_test_responses ttr ON ttr.attempt_id = tta.id
             WHERE tta.user_id = ?
-        ) grouped_scores
-        GROUP BY section_name
+            UNION ALL
+            SELECT
+                'company' AS source_type,
+                c.company_name AS topic_name,
+                ct.test_name AS test_name,
+                c.company_name AS section_name,
+                ctq.section AS category_name,
+                COALESCE(ctq.difficulty, 'Medium') AS difficulty,
+                CAST(ctr.is_correct AS INTEGER) AS is_correct,
+                cta.score AS score,
+                cta.completed_at AS completed_at
+            FROM company_test_attempts cta
+            JOIN company_tests ct ON cta.company_test_id = ct.id
+            JOIN companies c ON ct.company_id = c.id
+            JOIN company_test_responses ctr ON ctr.attempt_id = cta.id
+            JOIN company_test_questions ctq ON ctq.id = ctr.question_id
+            WHERE cta.user_id = ?
+        ) detailed_rows
+        ORDER BY completed_at DESC
         """,
         (user_id, user_id),
     )
 
 
-def save_ai_recommendation(user_id, weak_sections, improvement_areas, practice_focus, readiness_score):
+def save_ai_recommendation(user_id, weak_sections, improvement_areas, practice_focus, readiness_score, recommendation_payload=None):
     return _execute(
-        "INSERT INTO ai_recommendations (user_id, weak_sections, improvement_areas, practice_focus, readiness_score) VALUES (?, ?, ?, ?, ?)",
-        (user_id, weak_sections, improvement_areas, practice_focus, readiness_score),
+        "INSERT INTO ai_recommendations (user_id, weak_sections, improvement_areas, practice_focus, readiness_score, recommendation_payload) VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, weak_sections, improvement_areas, practice_focus, readiness_score, recommendation_payload),
     )
 
 
@@ -642,6 +732,20 @@ def upsert_resume_for_user(user_id, resume_data, scores):
     return _execute(
         "INSERT INTO resumes (user_id, full_name, email, phone, education, skills, experience, projects, certifications, target_company, target_role, job_description, resume_text, ats_score, keyword_score, format_score, overall_score, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (user_id,) + params,
+    )
+
+
+def save_resume_ai_suggestions(user_id, resume_text, job_description_text, suggestions_payload, source):
+    existing = get_resume_for_user(user_id)
+    if existing:
+        _execute(
+            "UPDATE resumes SET resume_text = COALESCE(?, resume_text), job_description = COALESCE(?, job_description), ai_suggestions_payload = ?, ai_suggestions_source = ?, ai_suggestions_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+            (resume_text, job_description_text, suggestions_payload, source, user_id),
+        )
+        return existing["id"]
+    return _execute(
+        "INSERT INTO resumes (user_id, job_description, resume_text, ai_suggestions_payload, ai_suggestions_source, ai_suggestions_updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+        (user_id, job_description_text, resume_text, suggestions_payload, source),
     )
 
 

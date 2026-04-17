@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import re
 from datetime import datetime
@@ -25,6 +26,15 @@ TOPIC_TEST_MAP = {
     test["test_id"]: test
     for topic in TOPIC_TEST_CATALOG
     for test in topic["tests"]
+}
+TOPIC_QUESTION_MAP = {
+    question["question_key"]: {
+        "topic_name": test["topic_name"],
+        "question_text": question["question_text"],
+        "difficulty": question.get("difficulty", "Medium"),
+    }
+    for test in TOPIC_TEST_MAP.values()
+    for question in test["questions"]
 }
 
 
@@ -95,45 +105,121 @@ def calculate_resume_score(resume_data, jd_match_percentage=0):
 
 
 def build_ai_recommendation_payload(performance_rows):
-    weak_sections = []
+    if not performance_rows:
+        return {
+            "weak_sections": [],
+            "improvement_areas": [],
+            "practice_focus": "Take a few tests to unlock personalized performance recommendations.",
+            "readiness_score": 0,
+            "topic_accuracy": [],
+            "difficulty_analysis": {},
+            "repeated_mistakes": [],
+            "recommended_next_tests": [],
+            "latest_recommendations": [],
+        }
+
+    attempt_scores = {}
+    topic_stats = {}
+    difficulty_stats = {}
+    category_stats = {}
+    incorrect_categories = {}
+
+    for row in performance_rows:
+        question_meta = TOPIC_QUESTION_MAP.get(row["category_name"], {})
+        topic_name = row["section_name"] or row["topic_name"] or question_meta.get("topic_name") or "General"
+        question_text = question_meta.get("question_text", "")
+        difficulty = row["difficulty"] or question_meta.get("difficulty") or "Medium"
+        attempt_key = (row["source_type"], row["topic_name"], row["test_name"], row["completed_at"])
+        attempt_scores[attempt_key] = row["score"] or 0
+
+        topic_bucket = topic_stats.setdefault(topic_name, {"correct": 0, "total": 0})
+        topic_bucket["total"] += 1
+        if row["is_correct"]:
+            topic_bucket["correct"] += 1
+
+        difficulty_bucket = difficulty_stats.setdefault(difficulty, {"correct": 0, "total": 0})
+        difficulty_bucket["total"] += 1
+        if row["is_correct"]:
+            difficulty_bucket["correct"] += 1
+
+        raw_category = row["category_name"] or ""
+        if row["source_type"] == "company" and raw_category in TOPIC_CATEGORY_PATTERNS:
+            category_name = raw_category
+        elif row["source_type"] == "company" and raw_category in {"Logical Reasoning", "Verbal Ability"}:
+            category_name = raw_category
+        else:
+            category_name = infer_topic_category(topic_name, question_text or raw_category)
+        category_bucket = category_stats.setdefault(category_name, {"correct": 0, "total": 0})
+        category_bucket["total"] += 1
+        if row["is_correct"]:
+            category_bucket["correct"] += 1
+        else:
+            incorrect_categories[category_name] = incorrect_categories.get(category_name, 0) + 1
+
+    overall_avg = sum(attempt_scores.values()) / len(attempt_scores) if attempt_scores else 0
+    topic_accuracy = [
+        {"topic": topic, "accuracy": round((stats["correct"] / stats["total"]) * 100, 2), "questions_seen": stats["total"]}
+        for topic, stats in sorted(topic_stats.items())
+        if stats["total"]
+    ]
+    topic_accuracy.sort(key=lambda item: item["accuracy"])
+    weak_sections = [item["topic"] for item in topic_accuracy if item["accuracy"] < 60][:4]
+
+    difficulty_analysis = {
+        level: round((stats["correct"] / stats["total"]) * 100, 2)
+        for level, stats in difficulty_stats.items()
+        if stats["total"]
+    }
+    repeated_mistakes = [name for name, count in sorted(incorrect_categories.items(), key=lambda item: item[1], reverse=True) if count >= 2][:5]
+
+    recommendations = []
+    for item in topic_accuracy[:3]:
+        if item["accuracy"] < 60:
+            recommendations.append(f"Your overall accuracy in {item['topic']} is only {item['accuracy']}%.")
+
+    easy_accuracy = difficulty_analysis.get("Easy")
+    medium_accuracy = difficulty_analysis.get("Medium")
+    hard_accuracy = difficulty_analysis.get("Hard")
+    if easy_accuracy is not None and medium_accuracy is not None and medium_accuracy + 12 < easy_accuracy:
+        recommendations.append("Performance drops significantly in Medium-difficulty questions.")
+    if medium_accuracy is not None and hard_accuracy is not None and hard_accuracy + 12 < medium_accuracy:
+        recommendations.append("Hard-difficulty accuracy is trailing behind your medium sets.")
+    if repeated_mistakes:
+        recommendations.append(f"Repeated mistakes are appearing in {', '.join(repeated_mistakes[:3])}.")
+
     improvement_areas = []
-    overall_avg = 0
+    for section_name in weak_sections:
+        if section_name == "Aptitude":
+            improvement_areas.append("Practice more quantitative problems, especially percentages, averages, and time-based arithmetic.")
+        elif section_name in {"Logical", "Logical Reasoning"}:
+            improvement_areas.append("Work on pattern recognition, coding-decoding, and arrangement puzzles.")
+        elif section_name in {"Verbal", "Verbal Ability"}:
+            improvement_areas.append("Revise grammar rules, vocabulary usage, and sentence correction patterns.")
+        elif section_name == "DSA Basics":
+            improvement_areas.append("Strengthen core data structures, searching, sorting, and complexity analysis.")
+        elif section_name == "SQL":
+            improvement_areas.append("Revise joins, aggregation, filtering clauses, and key constraints.")
+        else:
+            improvement_areas.append(f"Spend more practice time improving {section_name}.")
 
-    if performance_rows:
-        scores = [row["avg_score"] for row in performance_rows]
-        overall_avg = sum(scores) / len(scores) if scores else 0
-        for row in performance_rows:
-            if row["avg_score"] >= 60:
-                continue
-            section_name = row["section_name"]
-            weak_sections.append(section_name)
-            if section_name == "Aptitude":
-                improvement_areas.append("Practice more quantitative problems and speed calculations")
-            elif section_name in ("Logical Reasoning", "Logical"):
-                improvement_areas.append("Work on pattern recognition and logical puzzles")
-            elif section_name in ("Coding", "DSA Basics"):
-                improvement_areas.append("Focus on data structures and algorithms")
-            elif section_name == "Verbal":
-                improvement_areas.append("Improve vocabulary, grammar accuracy, and reading comprehension speed")
-            elif section_name == "SQL":
-                improvement_areas.append("Revise joins, grouping, filtering, and query writing fundamentals")
-            elif section_name == "HR & Soft Skills":
-                improvement_areas.append("Improve communication and behavioral interview skills")
-            elif section_name == "Domain Knowledge":
-                improvement_areas.append("Study core technical concepts and fundamentals")
-
+    recommended_next_tests = [f"{section} next practice set" for section in weak_sections[:3]]
     if overall_avg < 50:
-        practice_focus = "Focus on fundamentals across all sections. Take more practice tests."
+        practice_focus = "Focus on fundamentals first, then move back to timed mixed tests."
     elif overall_avg < 70:
-        practice_focus = "Good progress! Concentrate on weak areas and time management."
+        practice_focus = "You are progressing well. Prioritize weak topics and medium-difficulty consistency."
     else:
-        practice_focus = "Excellent performance! Maintain consistency and polish advanced topics."
+        practice_focus = "You are close to demo-ready placement performance. Maintain consistency and sharpen weak patterns."
 
     return {
         "weak_sections": weak_sections,
-        "improvement_areas": improvement_areas,
+        "improvement_areas": improvement_areas[:5],
         "practice_focus": practice_focus,
         "readiness_score": round(min(overall_avg + 10, 100), 2),
+        "topic_accuracy": topic_accuracy,
+        "difficulty_analysis": difficulty_analysis,
+        "repeated_mistakes": repeated_mistakes,
+        "recommended_next_tests": recommended_next_tests,
+        "latest_recommendations": recommendations[:5],
     }
 
 
@@ -420,6 +506,10 @@ def extract_uploaded_document_text(uploaded_file, allowed_extensions):
     return ResumeParser.extract_text(file_path), file_extension
 
 
+def should_use_openai_resume_ai():
+    return os.environ.get("ENABLE_OPENAI_RESUME_AI", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_openai_client():
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -452,28 +542,374 @@ def normalize_suggestions_payload(payload):
     }
 
 
-def generate_resume_ai_suggestions(resume_text, job_description_text):
-    client = get_openai_client()
-    response = client.responses.create(
-        model=current_app.config["OPENAI_MODEL"],
-        instructions="You are an expert resume coach. Return valid JSON with the keys top_strengths, priority_improvements, missing_keywords, rewritten_summary, and bullet_improvements.",
-        input=[{"role": "user", "content": [{"type": "input_text", "text": f"Analyze this resume against the job description and suggest improvements.\n\nResume Text:\n{resume_text}\n\nJob Description Text:\n{job_description_text}"}]}],
+def tokenize_for_tfidf(text):
+    tokens = re.findall(r"[a-z0-9+#.]{2,}", (text or "").lower())
+    stop_words = {
+        "about", "after", "again", "along", "also", "an", "and", "are", "as", "at", "be", "because", "been",
+        "before", "being", "between", "both", "build", "built", "can", "candidate", "consider", "currently", "data",
+        "demo", "description", "developer", "developers", "do", "for", "from", "have", "help", "high", "if", "in",
+        "into", "is", "it", "job", "knowledge", "low", "match", "more", "of", "on", "or", "our", "role", "should",
+        "skills", "software", "strong", "team", "than", "that", "the", "their", "them", "then", "these", "this",
+        "through", "to", "using", "very", "we", "well", "with", "work", "worked", "your",
+    }
+    return [token for token in tokens if token not in stop_words and len(token) > 2]
+
+
+def build_tfidf_vector(tokens, document_sets):
+    vector = {}
+    total_terms = len(tokens) or 1
+    vocabulary = set(tokens)
+    for term in vocabulary:
+        tf = tokens.count(term) / total_terms
+        doc_frequency = sum(1 for doc in document_sets if term in doc)
+        idf = math.log((1 + len(document_sets)) / (1 + doc_frequency)) + 1
+        vector[term] = tf * idf
+    return vector
+
+
+def cosine_similarity_score(vector_a, vector_b):
+    if not vector_a or not vector_b:
+        return 0.0
+    shared_terms = set(vector_a) | set(vector_b)
+    dot_product = sum(vector_a.get(term, 0.0) * vector_b.get(term, 0.0) for term in shared_terms)
+    magnitude_a = math.sqrt(sum(value * value for value in vector_a.values()))
+    magnitude_b = math.sqrt(sum(value * value for value in vector_b.values()))
+    if magnitude_a == 0 or magnitude_b == 0:
+        return 0.0
+    return round((dot_product / (magnitude_a * magnitude_b)) * 100, 2)
+
+
+def extract_ranked_keywords(cleaned_text, max_keywords=12):
+    tokens = tokenize_for_tfidf(cleaned_text)
+    ranked = []
+    seen = set()
+    for token in tokens:
+        if token not in seen:
+            ranked.append(token)
+            seen.add(token)
+        if len(ranked) >= max_keywords:
+            break
+    return ranked
+
+
+def estimate_shortlisting_probability(match_percentage):
+    if match_percentage >= 80:
+        return "High shortlisting probability"
+    if match_percentage >= 60:
+        return "Moderate shortlisting probability"
+    if match_percentage >= 40:
+        return "Needs improvement for shortlisting"
+    return "Low shortlisting probability until resume alignment improves"
+
+
+def build_section_improvements(missing_keywords, resume_text, match_percentage):
+    lowered_resume = (resume_text or "").lower()
+    improvements = []
+    if missing_keywords:
+        top_missing = ", ".join(missing_keywords[:3])
+        improvements.append({
+            "section": "Skills",
+            "improvement": f"Add or strengthen evidence for {top_missing} so recruiters can quickly confirm role alignment.",
+        })
+    if "project" not in lowered_resume and missing_keywords:
+        improvements.append({
+            "section": "Projects",
+            "improvement": f"Consider adding projects or experience related to {missing_keywords[0]} with outcomes, tools, and measurable impact.",
+        })
+    elif count_projects(resume_text) <= 1:
+        improvements.append({
+            "section": "Projects",
+            "improvement": "Resume length appears short on project evidence; expand project descriptions with measurable impact, ownership, and tech stack details.",
+        })
+    if match_percentage < 55:
+        improvements.append({
+            "section": "Experience",
+            "improvement": "Rephrase resume bullets using job description keywords for better ATS matching and clearer relevance to the target role.",
+        })
+    if "summary" not in lowered_resume and "objective" not in lowered_resume:
+        improvements.append({
+            "section": "Summary",
+            "improvement": "Add a short professional summary that mirrors the role focus, core stack, and strongest achievements from your resume.",
+        })
+    return improvements[:4]
+
+
+def build_ats_tips(missing_keywords, match_percentage, resume_text):
+    tips = []
+    if missing_keywords:
+        tips.append(f"Use exact JD keywords such as {', '.join(missing_keywords[:3])} in relevant skills, project, or experience bullets.")
+    if match_percentage < 60:
+        tips.append("Your resume match score is low; focus on aligning technical skills, frameworks, and delivery outcomes with the role requirements.")
+    if len((resume_text or '').split()) < 220:
+        tips.append("Resume length appears short; expand project descriptions with measurable impact, scale, and ownership.")
+    tips.append("Keep role-specific keywords close to achievements so ATS systems and recruiters see both skill and evidence together.")
+    return tips[:4]
+
+
+def generate_local_resume_ai_suggestions(resume_text, job_description_text, fallback_reason=None):
+    from nlp.skill_extractor import SkillExtractor
+    from nlp.text_preprocessing import TextPreprocessor
+
+    preprocessor = TextPreprocessor()
+    extractor = SkillExtractor()
+    cleaned_resume = preprocessor.preprocess(resume_text)
+    cleaned_job = preprocessor.preprocess(job_description_text)
+
+    resume_tokens = tokenize_for_tfidf(cleaned_resume)
+    job_tokens = tokenize_for_tfidf(cleaned_job)
+    document_sets = [set(resume_tokens), set(job_tokens)]
+    resume_vector = build_tfidf_vector(resume_tokens, document_sets)
+    job_vector = build_tfidf_vector(job_tokens, document_sets)
+    similarity_score = cosine_similarity_score(resume_vector, job_vector)
+
+    resume_skills = [skill.lower() for skill in extractor.extract_skills(cleaned_resume)]
+    job_skills = [skill.lower() for skill in extractor.extract_skills(cleaned_job)]
+    jd_keywords = list(dict.fromkeys(job_skills + extract_ranked_keywords(cleaned_job)))
+    resume_keywords = set(resume_skills + extract_ranked_keywords(cleaned_resume, max_keywords=18))
+    missing_keywords = [keyword for keyword in jd_keywords if keyword not in resume_keywords][:8]
+    weak_keywords = [keyword for keyword in jd_keywords if cleaned_resume.count(keyword) == 1][:5]
+
+    strengths = []
+    overlap_keywords = [keyword for keyword in jd_keywords if keyword in resume_keywords][:5]
+    if overlap_keywords:
+        strengths.append(f"Strong overlap detected for {', '.join(overlap_keywords[:3])}.")
+    if similarity_score >= 65:
+        strengths.append("Resume language is already reasonably aligned with the job description.")
+    if count_projects(resume_text) >= 2:
+        strengths.append("Project coverage gives you useful proof points for recruiter screening.")
+    if not strengths:
+        strengths.append("The resume has a baseline foundation, but stronger role alignment is needed for better screening outcomes.")
+
+    section_improvements = build_section_improvements(missing_keywords or weak_keywords, resume_text, similarity_score)
+    ats_tips = build_ats_tips(missing_keywords or weak_keywords, similarity_score, resume_text)
+    priority_improvements = [item["improvement"] for item in section_improvements]
+    if weak_keywords:
+        priority_improvements.append(f"Some important JD terms are weakly represented: {', '.join(weak_keywords[:3])}. Add stronger evidence around them.")
+
+    rewritten_summary = (
+        f"Role-aligned candidate with experience in {', '.join((overlap_keywords or jd_keywords)[:4]) or 'software development'}, "
+        f"focused on delivering measurable outcomes and stronger alignment to the target job requirements."
     )
-    return normalize_suggestions_payload(extract_json_object(response.output_text))
+
+    notice = None
+    if fallback_reason or not should_use_openai_resume_ai():
+        notice = "Advanced AI suggestions currently unavailable. Showing intelligent NLP-based recommendations."
+
+    return {
+        "source": "nlp",
+        "notice": notice,
+        "match_percentage": similarity_score,
+        "skill_gaps": missing_keywords[:6],
+        "missing_keywords": missing_keywords[:8],
+        "section_wise_improvements": section_improvements,
+        "ats_optimization_tips": ats_tips,
+        "shortlisting_probability_estimate": estimate_shortlisting_probability(similarity_score),
+        "top_strengths": strengths[:3],
+        "priority_improvements": priority_improvements[:5],
+        "rewritten_summary": rewritten_summary,
+        "bullet_improvements": ats_tips[:3],
+    }
+
+
+def generate_resume_ai_suggestions(resume_text, job_description_text):
+    if not should_use_openai_resume_ai():
+        return generate_local_resume_ai_suggestions(resume_text, job_description_text)
+
+    try:
+        client = get_openai_client()
+        response = client.responses.create(
+            model=current_app.config["OPENAI_MODEL"],
+            instructions="You are an expert resume coach. Return valid JSON with the keys top_strengths, priority_improvements, missing_keywords, rewritten_summary, and bullet_improvements.",
+            input=[{"role": "user", "content": [{"type": "input_text", "text": f"Analyze this resume against the job description and suggest improvements.\n\nResume Text:\n{resume_text}\n\nJob Description Text:\n{job_description_text}"}]}],
+        )
+        normalized = normalize_suggestions_payload(extract_json_object(response.output_text))
+        return {
+            "source": "openai",
+            "notice": None,
+            "match_percentage": 0,
+            "skill_gaps": normalized["missing_keywords"],
+            "missing_keywords": normalized["missing_keywords"],
+            "section_wise_improvements": [{"section": "Resume", "improvement": item} for item in normalized["priority_improvements"]],
+            "ats_optimization_tips": normalized["bullet_improvements"],
+            "shortlisting_probability_estimate": "AI-generated estimate available in narrative guidance",
+            **normalized,
+        }
+    except Exception:
+        return generate_local_resume_ai_suggestions(resume_text, job_description_text, fallback_reason="openai_unavailable")
+
+
+def generate_local_resume_ai_chat_reply(resume_text, job_description_text, suggestions, question, chat_history):
+    question_lower = (question or "").lower()
+    missing_keywords = suggestions.get("missing_keywords") or []
+    section_improvements = suggestions.get("section_wise_improvements") or []
+    ats_tips = suggestions.get("ats_optimization_tips") or []
+    match_percentage = suggestions.get("match_percentage") or 0
+
+    if "skill" in question_lower or "missing" in question_lower:
+        if missing_keywords:
+            return f"The clearest skill gaps are {', '.join(missing_keywords[:4])}. Add them only where you have real evidence, ideally inside project or experience bullets tied to outcomes."
+        return "Your resume already covers most of the visible JD keywords, so the next improvement is making those skills easier to spot through stronger bullet wording and measurable outcomes."
+    if "experience" in question_lower or "project" in question_lower:
+        project_guidance = next((item["improvement"] for item in section_improvements if item.get("section") in {"Experience", "Projects"}), None)
+        return project_guidance or "Strengthen experience bullets by naming the stack, the problem solved, your ownership, and a measurable result such as speed, scale, or accuracy improvement."
+    if "ats" in question_lower or "keyword" in question_lower:
+        return " ".join(ats_tips[:2]) if ats_tips else "Mirror the job description language in your headings and bullets, especially around tools, frameworks, and delivery outcomes."
+    if "score" in question_lower or "match" in question_lower or "chance" in question_lower:
+        return f"Your current local match score is {round(match_percentage, 2)}%. The fastest way to improve it is to close the keyword gaps, strengthen project evidence, and rephrase bullets so they reflect the target role vocabulary."
+    if "summary" in question_lower:
+        return suggestions.get("rewritten_summary") or "Write a short summary that names your target role, strongest stack, and one or two outcome-focused strengths relevant to the JD."
+    if missing_keywords:
+        return f"A strong next step is to improve evidence around {missing_keywords[0]} and related JD language. Update the relevant skills, project, and experience bullets so the match is easier for ATS and recruiters to detect."
+    return "Your resume is on the right track. Focus on clearer role alignment, measurable impact in bullets, and stronger keyword placement in the sections most relevant to the job description."
 
 
 def generate_resume_ai_chat_reply(resume_text, job_description_text, suggestions, question, chat_history):
-    client = get_openai_client()
-    messages = [{"role": "user", "content": [{"type": "input_text", "text": f"Use the following context to answer follow-up resume improvement questions.\n\nResume Text:\n{resume_text}\n\nJob Description Text:\n{job_description_text}\n\nCurrent Suggestions:\n{json.dumps(suggestions)}"}]}]
-    for message in chat_history[-6:]:
-        role = message.get("role")
-        content = (message.get("content") or "").strip()
-        if role in {"user", "assistant"} and content:
-            messages.append({"role": role, "content": [{"type": "input_text", "text": content}]})
-    messages.append({"role": "user", "content": [{"type": "input_text", "text": question}]})
-    response = client.responses.create(
-        model=current_app.config["OPENAI_MODEL"],
-        instructions="You are a resume coach. Answer follow-up questions using the supplied resume, job description, and prior suggestions. Keep responses clear and actionable.",
-        input=messages,
-    )
-    return response.output_text.strip()
+    if suggestions.get("source") == "nlp" or not should_use_openai_resume_ai():
+        return generate_local_resume_ai_chat_reply(resume_text, job_description_text, suggestions, question, chat_history)
+
+    try:
+        client = get_openai_client()
+        messages = [{"role": "user", "content": [{"type": "input_text", "text": f"Use the following context to answer follow-up resume improvement questions.\n\nResume Text:\n{resume_text}\n\nJob Description Text:\n{job_description_text}\n\nCurrent Suggestions:\n{json.dumps(suggestions)}"}]}]
+        for message in chat_history[-6:]:
+            role = message.get("role")
+            content = (message.get("content") or "").strip()
+            if role in {"user", "assistant"} and content:
+                messages.append({"role": role, "content": [{"type": "input_text", "text": content}]})
+        messages.append({"role": "user", "content": [{"type": "input_text", "text": question}]})
+        response = client.responses.create(
+            model=current_app.config["OPENAI_MODEL"],
+            instructions="You are a resume coach. Answer follow-up questions using the supplied resume, job description, and prior suggestions. Keep responses clear and actionable.",
+            input=messages,
+        )
+        return response.output_text.strip()
+    except Exception:
+        return generate_local_resume_ai_chat_reply(resume_text, job_description_text, suggestions, question, chat_history)
+
+
+TOPIC_CATEGORY_PATTERNS = {
+    "Aptitude": {
+        "Time & Work": ["work", "pipe", "tank", "days", "finish"],
+        "Percentages": ["percent", "%", "discount", "interest"],
+        "Speed & Distance": ["train", "speed", "distance", "km", "hours"],
+        "Average & Ratio": ["average", "ratio", "class", "boys", "girls"],
+    },
+    "Logical": {
+        "Series & Patterns": ["series", "next", "missing term"],
+        "Coding-Decoding": ["code", "coded", "written as"],
+        "Directions & Arrangements": ["east", "west", "north", "south", "row"],
+        "Syllogisms & Relations": ["all", "some", "related", "conclusion", "photograph"],
+    },
+    "Logical Reasoning": {
+        "Series & Patterns": ["series", "next", "missing term"],
+        "Coding-Decoding": ["code", "coded", "written as"],
+        "Directions & Arrangements": ["east", "west", "north", "south", "row"],
+        "Syllogisms & Relations": ["all", "some", "related", "conclusion", "photograph"],
+    },
+    "Verbal": {
+        "Grammar": ["grammar", "grammatically", "fill in the blank", "sentence", "verb"],
+        "Vocabulary": ["synonym", "antonym", "meaning", "word closest"],
+        "Usage & Idioms": ["idiom", "usage", "punctuation", "correctly spelled"],
+    },
+    "Verbal Ability": {
+        "Grammar": ["grammar", "grammatically", "fill in the blank", "sentence", "verb"],
+        "Vocabulary": ["synonym", "antonym", "meaning", "word closest"],
+        "Usage & Idioms": ["idiom", "usage", "punctuation", "correctly spelled"],
+    },
+    "DSA Basics": {
+        "Data Structures": ["stack", "queue", "heap", "hash", "tree"],
+        "Algorithms": ["sort", "search", "merge", "dfs", "bfs"],
+        "Complexity": ["complexity", "worst-case", "average-case", "o("],
+    },
+    "SQL": {
+        "Joins & Aggregation": ["join", "group", "having", "count", "sum", "max"],
+        "DDL & DML": ["alter", "update", "delete", "truncate", "insert"],
+        "Filtering & Keys": ["where", "like", "primary key", "distinct", "filter"],
+    },
+}
+
+
+def infer_topic_category(topic_name, question_text):
+    normalized = (question_text or "").lower()
+    topic_patterns = TOPIC_CATEGORY_PATTERNS.get(topic_name, {})
+    if not topic_patterns and topic_name in {"Logical Reasoning", "Verbal Ability"}:
+        fallback_topic = "Logical" if topic_name == "Logical Reasoning" else "Verbal"
+        topic_patterns = TOPIC_CATEGORY_PATTERNS.get(fallback_topic, {})
+    for category, patterns in topic_patterns.items():
+        if any(pattern in normalized for pattern in patterns):
+            return category
+    return topic_name
+
+
+def build_test_performance_feedback(test_label, topic_name, questions, answers, recommendation_pool=None):
+    category_stats = {}
+    difficulty_stats = {}
+    incorrect_categories = []
+    correct_count = 0
+
+    for question in questions:
+        question_id = str(question.get("question_id", question.get("id", "")))
+        selected_answer = (answers.get(question_id) or answers.get(question.get("question_id")) or answers.get(str(question.get("id"))) or "").upper()
+        correct_answer = (question.get("correct_answer") or "").upper()
+        is_correct = selected_answer == correct_answer
+        if is_correct:
+            correct_count += 1
+
+        difficulty = question.get("difficulty", "Medium")
+        question_topic = question.get("section") or topic_name
+        category = infer_topic_category(question_topic, question.get("question_text", ""))
+
+        category_bucket = category_stats.setdefault(category, {"correct": 0, "total": 0})
+        category_bucket["total"] += 1
+        if is_correct:
+            category_bucket["correct"] += 1
+        else:
+            incorrect_categories.append(category)
+
+        difficulty_bucket = difficulty_stats.setdefault(difficulty, {"correct": 0, "total": 0})
+        difficulty_bucket["total"] += 1
+        if is_correct:
+            difficulty_bucket["correct"] += 1
+
+    recommendations = []
+    for category, stats in category_stats.items():
+        accuracy = (stats["correct"] / stats["total"] * 100) if stats["total"] else 0
+        if accuracy < 50:
+            recommendations.append(f"Your accuracy in {category} questions is low.")
+
+    easy_accuracy = (difficulty_stats.get("Easy", {}).get("correct", 0) / max(difficulty_stats.get("Easy", {}).get("total", 1), 1)) * 100 if difficulty_stats.get("Easy") else None
+    medium_accuracy = (difficulty_stats.get("Medium", {}).get("correct", 0) / max(difficulty_stats.get("Medium", {}).get("total", 1), 1)) * 100 if difficulty_stats.get("Medium") else None
+    hard_accuracy = (difficulty_stats.get("Hard", {}).get("correct", 0) / max(difficulty_stats.get("Hard", {}).get("total", 1), 1)) * 100 if difficulty_stats.get("Hard") else None
+
+    if medium_accuracy is not None and easy_accuracy is not None and medium_accuracy + 15 < easy_accuracy:
+        recommendations.append("Performance drops significantly in Medium-difficulty questions.")
+    if hard_accuracy is not None and ((medium_accuracy is not None and hard_accuracy + 15 < medium_accuracy) or hard_accuracy < 40):
+        recommendations.append("Hard-difficulty questions are reducing your score; revise fundamentals before moving to advanced sets.")
+
+    repeated_mistakes = [category for category, count in {item: incorrect_categories.count(item) for item in set(incorrect_categories)}.items() if count >= 2]
+    if repeated_mistakes:
+        recommendations.append(f"Repeated mistakes are appearing in {', '.join(repeated_mistakes[:3])}. Practice those patterns before reattempting similar tests.")
+
+    if recommendation_pool:
+        recommendations.append(f"Recommended next tests based on weak areas: {', '.join(recommendation_pool[:3])}.")
+
+    if not recommendations:
+        recommendations.append(f"Good job on {test_label}. Keep building consistency and move to the next test set for stronger placement readiness.")
+
+    difficulty_breakdown = {
+        level: round((stats["correct"] / stats["total"] * 100), 2)
+        for level, stats in difficulty_stats.items()
+        if stats["total"]
+    }
+    category_breakdown = {
+        category: round((stats["correct"] / stats["total"] * 100), 2)
+        for category, stats in category_stats.items()
+        if stats["total"]
+    }
+
+    return {
+        "summary": f"You answered {correct_count} out of {len(questions)} correctly in {test_label}.",
+        "recommendations": recommendations[:5],
+        "category_breakdown": category_breakdown,
+        "difficulty_breakdown": difficulty_breakdown,
+        "repeated_mistakes": repeated_mistakes[:5],
+    }

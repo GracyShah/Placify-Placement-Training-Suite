@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Company Wise Tests | Placify</title>
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
@@ -20,14 +21,26 @@
     </div>
   </nav>
 
-  <div class="container">
-    <h1 style="margin-bottom: 20px;">Company Wise Placement Tests</h1>
-    <p style="margin-bottom: 30px;">
-      Attempt full-length placement tests designed exactly like real company exams.
-    </p>
+  <div class="container" id="main-container">
+    <h1 id="page-title" style="margin: 40px 0 20px;">Company Wise Placement Tests</h1>
 
-    <div id="company-tests" class="grid grid-3">
-      <!-- Company cards load here -->
+    <div id="timer-container" class="timer-container hidden">
+      <span id="test-title">Company Placement Test</span>
+      <span id="timer">Time Left: 00:00</span>
+    </div>
+
+    <div id="test-instruction" class="alert alert-info">
+      Attempt structured company-specific placement tests. Reattempts are allowed, and solutions stay available after each attempt.
+    </div>
+
+    <div id="company-tests" class="grid grid-3" style="margin-top: 30px;"></div>
+
+    <div id="test-sections" class="grid grid-3 hidden"></div>
+
+    <div id="questions-container" class="questions-container hidden"></div>
+
+    <div id="submit-container" class="submit-container hidden">
+      <button class="btn btn-primary" onclick="submitTest()">Submit Test</button>
     </div>
   </div>
 
